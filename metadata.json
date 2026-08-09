@@ -1,0 +1,9 @@
+{
+  "name": "Rafiq - Personal AI Companion",
+  "description": "An intelligent, empathetic personal AI companion that listens, remembers, manages tasks, appointments, habits, alarms, and conducts daily reviews through natural conversation.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

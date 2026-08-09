@@ -1,0 +1,98 @@
+import { Router, Request, Response } from 'express';
+import { db } from '../db/database.js';
+import { SubscriptionService } from '../services/subscriptionService.js';
+import { PaymentGatewayManager } from '../services/payment/PaymentProvider.js';
+
+export const userSubscriptionRouter = Router();
+
+// GET /api/user/subscription?userId=xxx
+userSubscriptionRouter.get('/subscription', (req: Request, res: Response) => {
+  const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || 'user_default_01';
+  
+  const { user, subscription, plan } = SubscriptionService.getUserSubscription(userId);
+  const period = SubscriptionService.getCurrentPeriod();
+
+  const usageRecords = db.getUsageRecords().filter((r) => r.userId === userId && r.period === period);
+
+  const usageMap: Record<string, number> = {
+    ai_messages: 0,
+    voice_minutes: 0,
+    multi_ai: 0,
+    advanced_ai: 0,
+  };
+
+  usageRecords.forEach((r) => {
+    usageMap[r.feature] = r.count;
+  });
+
+  return res.json({
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      status: user.status,
+    },
+    subscription: {
+      id: subscription.id,
+      status: subscription.status,
+      startDate: subscription.startDate,
+      endDate: subscription.endDate,
+      autoRenew: subscription.autoRenew,
+      paymentProvider: subscription.paymentProvider,
+    },
+    plan: {
+      id: plan.id,
+      name: plan.name,
+      description: plan.description,
+      monthlyPrice: plan.monthlyPrice,
+      yearlyPrice: plan.yearlyPrice,
+      currency: plan.currency,
+      features: plan.features,
+      limits: plan.limits,
+    },
+    period,
+    usage: usageMap,
+  });
+});
+
+// GET /api/user/plans
+userSubscriptionRouter.get('/plans', (req: Request, res: Response) => {
+  const publicPlans = db.getPlans().filter((p) => p.active);
+  return res.json(publicPlans);
+});
+
+// POST /api/user/checkout
+userSubscriptionRouter.post('/checkout', async (req: Request, res: Response) => {
+  const { userId = 'user_default_01', planId, billingCycle = 'monthly', provider = 'stripe' } = req.body;
+
+  if (!planId) {
+    return res.status(400).json({ error: 'Plan ID is required' });
+  }
+
+  const gateway = PaymentGatewayManager.getProvider(provider);
+  if (!gateway) {
+    return res.status(400).json({ error: `Payment provider ${provider} not supported.` });
+  }
+
+  const result = await gateway.createCheckoutSession({
+    userId,
+    planId,
+    billingCycle,
+    currency: 'USD',
+  });
+
+  return res.json(result);
+});
+
+// POST /api/webhooks/payment
+userSubscriptionRouter.post('/webhooks/payment', async (req: Request, res: Response) => {
+  const providerName = (req.query.provider as string) || 'stripe';
+  const gateway = PaymentGatewayManager.getProvider(providerName);
+
+  if (!gateway) {
+    return res.status(400).json({ error: 'Unknown payment provider' });
+  }
+
+  const result = await gateway.processWebhookEvent(req.body, req.headers['stripe-signature'] as string);
+  return res.json(result);
+});

@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+:root {
+  --bg-main: #FAF8F5;
+  --bg-surface: #FFFFFF;
+  --bg-hover: #F2EFE9;
+  --text-main: #1F2421;
+  --text-muted: #6C7570;
+  --accent-sage: #5B8266;
+  --border-color: #E8E4DC;
+  color-scheme: light;
+}
+
+.dark {
+  --bg-main: #0F1211;
+  --bg-surface: #181D1B;
+  --bg-hover: #232A27;
+  --text-main: #F2F5F4;
+  --text-muted: #8E9A93;
+  --accent-sage: #5EA074;
+  --border-color: #27302B;
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Smooth transition for theme switches */
+*, ::before, ::after {
+  border-color: var(--border-color);
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes bounceSubtle {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+.animate-bounce-subtle {
+  animation: bounceSubtle 1.5s infinite ease-in-out;
+}
+
+/* Hide scrollbar utility */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

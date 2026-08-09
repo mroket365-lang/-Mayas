@@ -1,0 +1,230 @@
+import { db, PlanEntity, SubscriptionEntity, UsageRecordEntity, UserEntity } from '../db/database.js';
+
+export interface EntitlementCheckResult {
+  allowed: boolean;
+  reason?: string;
+  planId: string;
+  planName: string;
+  featureKey: string;
+  currentUsage: number;
+  maxLimit: number;
+  period: string;
+}
+
+export class SubscriptionService {
+  /**
+   * Get or initialize subscription for a user.
+   * If user doesn't exist, initializes user and assigns default Free plan.
+   */
+  public static getUserSubscription(userId: string): {
+    user: UserEntity;
+    subscription: SubscriptionEntity;
+    plan: PlanEntity;
+  } {
+    let user = db.findUserById(userId);
+    if (!user) {
+      user = db.upsertUser({
+        id: userId,
+        email: `${userId}@user.rafiq`,
+        name: 'Rafiq User',
+        role: 'user',
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        lastActiveAt: new Date().toISOString(),
+        currency: 'USD',
+      });
+    } else {
+      db.upsertUser({ ...user, lastActiveAt: new Date().toISOString() });
+    }
+
+    let sub = db.getSubscriptionByUserId(userId);
+    const now = new Date();
+
+    if (!sub) {
+      sub = db.upsertSubscription({
+        id: 'sub_' + Math.random().toString(36).substring(2, 9),
+        userId,
+        planId: db.getSettings().defaultPlan || 'free',
+        status: 'active',
+        startDate: now.toISOString(),
+        endDate: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        autoRenew: true,
+        paymentProvider: 'manual',
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+      });
+    }
+
+    // Check expiration
+    if (sub.status === 'active' && new Date(sub.endDate) < now && sub.planId !== 'free') {
+      sub.status = 'expired';
+      db.upsertSubscription(sub);
+      db.addSubscriptionHistory({
+        userId,
+        subscriptionId: sub.id,
+        planId: sub.planId,
+        action: 'expired',
+        status: 'expired',
+        details: 'Subscription expired automatically due to end date passage.',
+      });
+    }
+
+    let plan = db.findPlanById(sub.status === 'active' ? sub.planId : 'free');
+    if (!plan) {
+      plan = db.findPlanById('free')!;
+    }
+
+    return { user, subscription: sub, plan };
+  }
+
+  /**
+   * Checks if user is entitled to use a given feature and is within current period usage limit.
+   */
+  public static checkEntitlement(userId: string, featureKey: 'ai_messages' | 'voice_minutes' | 'multi_ai' | 'advanced_ai'): EntitlementCheckResult {
+    const { user, subscription, plan } = this.getUserSubscription(userId);
+
+    if (user.status === 'suspended' || user.status === 'banned') {
+      return {
+        allowed: false,
+        reason: 'Account is suspended or restricted.',
+        planId: plan.id,
+        planName: plan.name,
+        featureKey,
+        currentUsage: 0,
+        maxLimit: 0,
+        period: this.getCurrentPeriod(),
+      };
+    }
+
+    const settings = db.getSettings();
+    if (settings.maintenanceMode) {
+      return {
+        allowed: false,
+        reason: 'System is currently under scheduled maintenance.',
+        planId: plan.id,
+        planName: plan.name,
+        featureKey,
+        currentUsage: 0,
+        maxLimit: 0,
+        period: this.getCurrentPeriod(),
+      };
+    }
+
+    const period = this.getCurrentPeriod();
+    const usageRec = db.getUsageRecord(userId, period, featureKey);
+    const currentUsage = usageRec ? usageRec.count : 0;
+
+    let limitKey: keyof PlanEntity['limits'] = 'ai_messages_per_month';
+    if (featureKey === 'voice_minutes') limitKey = 'voice_minutes_per_month';
+    if (featureKey === 'multi_ai') limitKey = 'multi_ai_requests_per_month';
+    if (featureKey === 'advanced_ai') limitKey = 'advanced_ai_requests_per_month';
+
+    const maxLimit = plan.limits[limitKey] ?? 0;
+
+    if (featureKey === 'multi_ai' && !settings.multiAIEnabled) {
+      return {
+        allowed: false,
+        reason: 'Multi-AI orchestration feature is temporarily disabled by admin.',
+        planId: plan.id,
+        planName: plan.name,
+        featureKey,
+        currentUsage,
+        maxLimit,
+        period,
+      };
+    }
+
+    if (currentUsage >= maxLimit) {
+      return {
+        allowed: false,
+        reason: `Monthly limit reached for ${featureKey} (${currentUsage}/${maxLimit}).`,
+        planId: plan.id,
+        planName: plan.name,
+        featureKey,
+        currentUsage,
+        maxLimit,
+        period,
+      };
+    }
+
+    return {
+      allowed: true,
+      planId: plan.id,
+      planName: plan.name,
+      featureKey,
+      currentUsage,
+      maxLimit,
+      period,
+    };
+  }
+
+  public static recordUsage(userId: string, featureKey: string, amount: number = 1): UsageRecordEntity {
+    const period = this.getCurrentPeriod();
+    return db.incrementUsage(userId, period, featureKey, amount);
+  }
+
+  public static getCurrentPeriod(): string {
+    const d = new Date();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${d.getFullYear()}-${month}`;
+  }
+
+  public static grantManualPremium(
+    targetUserId: string,
+    planId: string,
+    durationDays: number,
+    adminId: string,
+    adminEmail: string
+  ): SubscriptionEntity {
+    const plan = db.findPlanById(planId);
+    if (!plan) throw new Error(`Plan with ID ${planId} not found.`);
+
+    const now = new Date();
+    const endDate = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+
+    let sub = db.getSubscriptionByUserId(targetUserId);
+
+    if (!sub) {
+      sub = {
+        id: 'sub_' + Math.random().toString(36).substring(2, 9),
+        userId: targetUserId,
+        planId,
+        status: 'active',
+        startDate: now.toISOString(),
+        endDate: endDate.toISOString(),
+        autoRenew: false,
+        paymentProvider: 'manual',
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+      };
+    } else {
+      sub.planId = planId;
+      sub.status = 'active';
+      sub.startDate = now.toISOString();
+      sub.endDate = endDate.toISOString();
+      sub.paymentProvider = 'manual';
+    }
+
+    db.upsertSubscription(sub);
+
+    db.addSubscriptionHistory({
+      userId: targetUserId,
+      subscriptionId: sub.id,
+      planId,
+      action: 'manual_grant',
+      status: 'active',
+      performedBy: adminId,
+      details: `Granted ${plan.name} manually for ${durationDays} days.`,
+    });
+
+    db.addAuditLog({
+      adminId,
+      adminEmail,
+      action: 'GRANT_PREMIUM',
+      targetUserId,
+      details: `Granted plan '${plan.name}' (${planId}) for ${durationDays} days.`,
+    });
+
+    return sub;
+  }
+}
