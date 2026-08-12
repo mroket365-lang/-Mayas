@@ -39,6 +39,171 @@ interface CompanionViewProps {
   onOpenPermissions: () => void;
 }
 
+interface ChatMessageItemProps {
+  msg: ChatMessage;
+  isLast: boolean;
+  isLoading: boolean;
+  profile: UserProfile;
+  copiedMsgId: string | null;
+  speakingMsgId: string | null;
+  onCopyMessage: (id: string, text: string) => void;
+  onExtractText: (text: string) => void;
+  onToggleSpeech: (id: string, text: string) => void;
+}
+
+const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(({
+  msg,
+  isLast,
+  isLoading,
+  profile,
+  copiedMsgId,
+  speakingMsgId,
+  onCopyMessage,
+  onExtractText,
+  onToggleSpeech,
+}) => {
+  const timeString = React.useMemo(() => {
+    try {
+      return new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
+  }, [msg.timestamp]);
+
+  return (
+    <div
+      className={`flex flex-col ${
+        msg.sender === 'user' ? 'items-end' : 'items-start'
+      } space-y-1.5 animate-fade-in`}
+    >
+      <div
+        className={`max-w-[85%] rounded-3xl px-4 py-3 shadow-sm text-sm leading-relaxed ${
+          msg.sender === 'user'
+            ? 'bg-[var(--accent-sage)] text-white rounded-br-none'
+            : 'bg-[var(--bg-surface)] text-[var(--text-main)] border border-[var(--border-color)] rounded-bl-none'
+        }`}
+      >
+        {/* Display attached image, video, or audio */}
+        {msg.mediaUrl && (
+          <div className="mb-2.5 rounded-2xl overflow-hidden border border-black/10 max-w-xs">
+            {msg.mediaType === 'video' ? (
+              <video
+                src={msg.mediaUrl}
+                controls
+                className="w-full max-h-56 object-cover rounded-2xl"
+              />
+            ) : msg.mediaType === 'audio' ? (
+              <audio
+                src={msg.mediaUrl}
+                controls
+                className="w-full py-1 px-1 rounded-2xl"
+              />
+            ) : (
+              <img
+                src={msg.mediaUrl}
+                alt="Attached media"
+                className="w-full max-h-56 object-cover rounded-2xl"
+                referrerPolicy="no-referrer"
+              />
+            )}
+          </div>
+        )}
+
+        <p className="whitespace-pre-wrap select-text">
+          {msg.text}
+          {isLoading && isLast && msg.sender === 'ai' && (
+            <span className="inline-block w-2 h-4 bg-[var(--accent-sage)] ml-1 animate-pulse rounded-full align-middle" />
+          )}
+        </p>
+
+        {/* Executed Action Cards */}
+        {msg.actionsTaken && msg.actionsTaken.length > 0 && (
+          <div className="mt-3 pt-2 border-t border-black/10 space-y-1.5">
+            {msg.actionsTaken.map((act, idx) => (
+              <div
+                key={idx}
+                className="p-2.5 rounded-2xl bg-black/5 dark:bg-white/10 text-xs flex items-center justify-between gap-2"
+              >
+                <div className="flex items-center gap-2">
+                  {act.itemType === 'appointment' && <Calendar className="w-4 h-4 text-emerald-500" />}
+                  {act.itemType === 'alarm' && <Bell className="w-4 h-4 text-amber-500" />}
+                  {act.itemType === 'task' && <Check className="w-4 h-4 text-blue-500" />}
+                  {act.itemType === 'memory' && <BookmarkCheck className="w-4 h-4 text-purple-500" />}
+                  <span className="font-bold">
+                    {act.itemType === 'memory'
+                      ? `${profile.language === 'ar' ? '🧠 تذكّر الرفيق:' : '🧠 Learned:'} ${act.title}`
+                      : act.title}
+                  </span>
+                </div>
+                {act.details && (
+                  <span className="opacity-70 text-[10px] bg-black/10 px-2 py-0.5 rounded-full">
+                    {act.details}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Message Footer Toolbar: Time, Copy, TTS Play/Stop, Snippet Extractor */}
+      <div className="flex items-center gap-1.5 px-1">
+        <span className="text-[10px] text-[var(--text-muted)] font-medium">
+          {timeString}
+        </span>
+
+        {/* Copy Entire Message Button */}
+        <button
+          onClick={() => onCopyMessage(msg.id, msg.text)}
+          className={`p-1.5 rounded-xl transition-all ${
+            copiedMsgId === msg.id
+              ? 'bg-emerald-500/10 text-emerald-600 font-bold'
+              : 'text-[var(--text-muted)] hover:text-[var(--accent-sage)] hover:bg-[var(--bg-hover)]'
+          }`}
+          title={profile.language === 'ar' ? 'نسخ الرسالة كاملة' : 'Copy entire message'}
+        >
+          {copiedMsgId === msg.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+        </button>
+
+        {/* Snippet Extractor Button */}
+        <button
+          onClick={() => onExtractText(msg.text)}
+          className="p-1.5 rounded-xl text-[var(--text-muted)] hover:text-[var(--accent-sage)] hover:bg-[var(--bg-hover)] transition-all"
+          title={profile.language === 'ar' ? 'تحديد ونسخ نص/أجزاء منفصلة' : 'Extract & copy text snippet'}
+        >
+          <Scissors className="w-3.5 h-3.5" />
+        </button>
+
+        {/* Play / Stop Reading TTS Button for AI Messages */}
+        {msg.sender === 'ai' && (
+          <button
+            onClick={() => onToggleSpeech(msg.id, msg.text)}
+            className={`p-1.5 rounded-xl transition-all flex items-center gap-1 ${
+              speakingMsgId === msg.id
+                ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 animate-pulse font-bold'
+                : 'text-[var(--text-muted)] hover:text-[var(--accent-sage)] hover:bg-[var(--bg-hover)]'
+            }`}
+            title={
+              speakingMsgId === msg.id
+                ? (profile.language === 'ar' ? 'إيقاف قراءة الرسالة' : 'Stop reading message')
+                : (profile.language === 'ar' ? 'تشغيل قراءة الرسالة' : 'Read message aloud')
+            }
+          >
+            {speakingMsgId === msg.id ? (
+              <>
+                <VolumeX className="w-3.5 h-3.5 text-rose-500" />
+                <span className="text-[9px]">{profile.language === 'ar' ? 'إيقاف' : 'Stop'}</span>
+              </>
+            ) : (
+              <Volume2 className="w-3.5 h-3.5" />
+            )}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+});
+
 export const CompanionView: React.FC<CompanionViewProps> = ({
   messages,
   profile,
@@ -72,24 +237,26 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
   const [extractingText, setExtractingText] = useState<string | null>(null);
 
-  const handleCopyMessage = (msgId: string, text: string) => {
+  const handleCopyMessage = React.useCallback((msgId: string, text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedMsgId(msgId);
     setTimeout(() => setCopiedMsgId(null), 2000);
-  };
+  }, []);
 
-  const handleToggleSpeech = (msgId: string, text: string) => {
-    if (speakingMsgId === msgId) {
-      speechService.stopSpeaking();
-      setSpeakingMsgId(null);
-    } else {
-      speechService.stopSpeaking();
-      setSpeakingMsgId(msgId);
-      speechService.speakText(text, profile.language, profile.voiceSpeed || 1.0, () => {
-        setSpeakingMsgId(null);
-      });
-    }
-  };
+  const handleToggleSpeech = React.useCallback((msgId: string, text: string) => {
+    setSpeakingMsgId((prevSpeaking) => {
+      if (prevSpeaking === msgId) {
+        speechService.stopSpeaking();
+        return null;
+      } else {
+        speechService.stopSpeaking();
+        speechService.speakText(text, profile.language, profile.voiceSpeed || 1.0, () => {
+          setSpeakingMsgId(null);
+        });
+        return msgId;
+      }
+    });
+  }, [profile.language, profile.voiceSpeed]);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -414,138 +581,19 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
             </div>
           </div>
         ) : (
-          messages.map((msg) => (
-            <div
+          messages.map((msg, idx) => (
+            <ChatMessageItem
               key={msg.id}
-              className={`flex flex-col ${
-                msg.sender === 'user' ? 'items-end' : 'items-start'
-              } space-y-1.5 animate-fade-in`}
-            >
-              <div
-                className={`max-w-[85%] rounded-3xl px-4 py-3 shadow-sm text-sm leading-relaxed ${
-                  msg.sender === 'user'
-                    ? 'bg-[var(--accent-sage)] text-white rounded-br-none'
-                    : 'bg-[var(--bg-surface)] text-[var(--text-main)] border border-[var(--border-color)] rounded-bl-none'
-                }`}
-              >
-                {/* Display attached image, video, or audio */}
-                {msg.mediaUrl && (
-                  <div className="mb-2.5 rounded-2xl overflow-hidden border border-black/10 max-w-xs">
-                    {msg.mediaType === 'video' ? (
-                      <video
-                        src={msg.mediaUrl}
-                        controls
-                        className="w-full max-h-56 object-cover rounded-2xl"
-                      />
-                    ) : msg.mediaType === 'audio' ? (
-                      <audio
-                        src={msg.mediaUrl}
-                        controls
-                        className="w-full py-1 px-1 rounded-2xl"
-                      />
-                    ) : (
-                      <img
-                        src={msg.mediaUrl}
-                        alt="Attached media"
-                        className="w-full max-h-56 object-cover rounded-2xl"
-                        referrerPolicy="no-referrer"
-                      />
-                    )}
-                  </div>
-                )}
-
-                <p className="whitespace-pre-wrap select-text">
-                  {msg.text}
-                  {isLoading && msg === messages[messages.length - 1] && msg.sender === 'ai' && (
-                    <span className="inline-block w-2 h-4 bg-[var(--accent-sage)] ml-1 animate-pulse rounded-full align-middle" />
-                  )}
-                </p>
-
-                {/* Executed Action Cards */}
-                {msg.actionsTaken && msg.actionsTaken.length > 0 && (
-                  <div className="mt-3 pt-2 border-t border-black/10 space-y-1.5">
-                    {msg.actionsTaken.map((act, idx) => (
-                      <div
-                        key={idx}
-                        className="p-2.5 rounded-2xl bg-black/5 dark:bg-white/10 text-xs flex items-center justify-between gap-2"
-                      >
-                        <div className="flex items-center gap-2">
-                          {act.itemType === 'appointment' && <Calendar className="w-4 h-4 text-emerald-500" />}
-                          {act.itemType === 'alarm' && <Bell className="w-4 h-4 text-amber-500" />}
-                          {act.itemType === 'task' && <Check className="w-4 h-4 text-blue-500" />}
-                          {act.itemType === 'memory' && <BookmarkCheck className="w-4 h-4 text-purple-500" />}
-                          <span className="font-bold">
-                            {act.itemType === 'memory'
-                              ? `${profile.language === 'ar' ? '🧠 تذكّر الرفيق:' : '🧠 Learned:'} ${act.title}`
-                              : act.title}
-                          </span>
-                        </div>
-                        {act.details && (
-                          <span className="opacity-70 text-[10px] bg-black/10 px-2 py-0.5 rounded-full">
-                            {act.details}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Message Footer Toolbar: Time, Copy, TTS Play/Stop, Snippet Extractor */}
-              <div className="flex items-center gap-1.5 px-1">
-                <span className="text-[10px] text-[var(--text-muted)] font-medium">
-                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-
-                {/* Copy Entire Message Button */}
-                <button
-                  onClick={() => handleCopyMessage(msg.id, msg.text)}
-                  className={`p-1.5 rounded-xl transition-all ${
-                    copiedMsgId === msg.id
-                      ? 'bg-emerald-500/10 text-emerald-600 font-bold'
-                      : 'text-[var(--text-muted)] hover:text-[var(--accent-sage)] hover:bg-[var(--bg-hover)]'
-                  }`}
-                  title={profile.language === 'ar' ? 'نسخ الرسالة كاملة' : 'Copy entire message'}
-                >
-                  {copiedMsgId === msg.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-
-                {/* Snippet Extractor Button */}
-                <button
-                  onClick={() => setExtractingText(msg.text)}
-                  className="p-1.5 rounded-xl text-[var(--text-muted)] hover:text-[var(--accent-sage)] hover:bg-[var(--bg-hover)] transition-all"
-                  title={profile.language === 'ar' ? 'تحديد ونسخ نص/أجزاء منفصلة' : 'Extract & copy text snippet'}
-                >
-                  <Scissors className="w-3.5 h-3.5" />
-                </button>
-
-                {/* Play / Stop Reading TTS Button for AI Messages */}
-                {msg.sender === 'ai' && (
-                  <button
-                    onClick={() => handleToggleSpeech(msg.id, msg.text)}
-                    className={`p-1.5 rounded-xl transition-all flex items-center gap-1 ${
-                      speakingMsgId === msg.id
-                        ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 animate-pulse font-bold'
-                        : 'text-[var(--text-muted)] hover:text-[var(--accent-sage)] hover:bg-[var(--bg-hover)]'
-                    }`}
-                    title={
-                      speakingMsgId === msg.id
-                        ? (profile.language === 'ar' ? 'إيقاف قراءة الرسالة' : 'Stop reading message')
-                        : (profile.language === 'ar' ? 'تشغيل قراءة الرسالة' : 'Read message aloud')
-                    }
-                  >
-                    {speakingMsgId === msg.id ? (
-                      <>
-                        <VolumeX className="w-3.5 h-3.5 text-rose-500" />
-                        <span className="text-[9px]">{profile.language === 'ar' ? 'إيقاف' : 'Stop'}</span>
-                      </>
-                    ) : (
-                      <Volume2 className="w-3.5 h-3.5" />
-                    )}
-                  </button>
-                )}
-              </div>
-            </div>
+              msg={msg}
+              isLast={idx === messages.length - 1}
+              isLoading={isLoading}
+              profile={profile}
+              copiedMsgId={copiedMsgId}
+              speakingMsgId={speakingMsgId}
+              onCopyMessage={handleCopyMessage}
+              onExtractText={setExtractingText}
+              onToggleSpeech={handleToggleSpeech}
+            />
           ))
         )}
 
@@ -569,7 +617,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
       />
 
       {/* Bottom Text, Media, & Voice Bar positioned cleanly above BottomNav */}
-      <div className="fixed bottom-[60px] left-0 right-0 z-30 bg-[var(--bg-surface)] border-t border-[var(--border-color)] p-2.5 sm:p-3 shadow-lg backdrop-blur-md">
+      <div className="fixed bottom-[60px] left-0 right-0 z-30 bg-[var(--bg-surface)] border-t border-[var(--border-color)] p-2.5 sm:p-3 shadow-lg">
         <div className="max-w-2xl mx-auto space-y-2">
           {/* Attachment Thumbnail Preview */}
           {attachedMedia && (

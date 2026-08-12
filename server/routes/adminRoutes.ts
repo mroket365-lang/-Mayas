@@ -114,7 +114,7 @@ adminRouter.get('/verify', requireAdminAuth, (req: Request, res: Response) => {
 });
 
 // 3. Dashboard Aggregated Stats
-adminRouter.get('/dashboard/stats', requireAdminAuth, (req: Request, res: Response) => {
+const getDashboardStats = (req: Request, res: Response) => {
   const users = db.getUsers();
   const subscriptions = db.getSubscriptions();
   const aiLogs = db.getAIUsageLogs();
@@ -150,7 +150,10 @@ adminRouter.get('/dashboard/stats', requireAdminAuth, (req: Request, res: Respon
     plansCount: plans.length,
     activePlansCount: plans.filter((p) => p.active).length,
   });
-});
+};
+
+adminRouter.get('/dashboard/stats', requireAdminAuth, getDashboardStats);
+adminRouter.get('/stats', requireAdminAuth, getDashboardStats);
 
 // 4. Users List (Paginated & Searchable)
 adminRouter.get('/users', requireAdminAuth, (req: Request, res: Response) => {

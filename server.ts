@@ -103,6 +103,11 @@ async function startServer() {
     }
   });
 
+  // API 404 catch-all
+  app.use('/api/*', (req, res) => {
+    res.status(404).json({ error: `API route not found: ${req.method} ${req.originalUrl}` });
+  });
+
   // Vite middleware for dev / static for prod
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
