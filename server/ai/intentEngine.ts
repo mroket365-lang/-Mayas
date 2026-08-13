@@ -19,12 +19,21 @@ export function analyzeIntentAndComplexity(
   let category: IntentCategory = 'conversation';
   let isActionRequired = false;
 
+  // Time and Date Query Detection
+  const timeKeywords = [
+    'كم الساعة', 'الساعة كم', 'كم الوقت', 'الوقت الان', 'ساعة كم', 'الوقت الآن',
+    'ما التاريخ', 'تاريخ اليوم', 'اي يوم', 'ما هو اليوم', 'أي يوم', 'كم التاريخ',
+    'what time', 'current time', 'what is the date', "what's the time", 'today date', 'what day is it'
+  ];
+
   if (msg.includes('صحيني') || msg.includes('منبه') || msg.includes('alarm')) {
     category = 'alarm';
     isActionRequired = true;
   } else if (msg.includes('ذكرني') || msg.includes('تذكير') || msg.includes('remind me') || msg.includes('reminder')) {
     category = 'reminder';
     isActionRequired = true;
+  } else if (timeKeywords.some((kw) => msg.includes(kw))) {
+    category = 'time_query';
   } else if (msg.includes('مهمة') || msg.includes('task') || msg.includes('جدول') || msg.includes('سوي لي')) {
     category = 'task';
     isActionRequired = true;
@@ -45,7 +54,7 @@ export function analyzeIntentAndComplexity(
   let complexity: IntentComplexity = 'medium';
   if (isHighComplexity) {
     complexity = 'high';
-  } else if (category === 'alarm' || category === 'schedule_query' || msg.length < 20) {
+  } else if (category === 'alarm' || category === 'time_query' || category === 'schedule_query' || msg.length < 20) {
     complexity = 'low';
   }
 

@@ -13,6 +13,8 @@ import { SettingsModal } from './components/SettingsModal';
 import { AlarmModal } from './components/AlarmModal';
 import { PermissionsModal } from './components/PermissionsModal';
 import { SubscriptionModal } from './components/SubscriptionModal';
+import { MaritalCounselingModal } from './components/MaritalCounselingModal';
+import { AuthModal } from './components/AuthModal';
 import { AdminPanel } from './admin/AdminPanel';
 
 export default function App() {
@@ -28,6 +30,8 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
   const [isSubscriptionOpen, setIsSubscriptionOpen] = useState(false);
+  const [isMaritalSupportOpen, setIsMaritalSupportOpen] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [ringingAlarm, setRingingAlarm] = useState<CompanionItem | null>(null);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [dailyReviewText, setDailyReviewText] = useState<string>('');
@@ -127,17 +131,41 @@ export default function App() {
     };
     setMessages((prev) => [...prev, pendingAiMsg]);
 
+    // Calculate exact real-time client device time context
+    const now = new Date();
+    const isArabic = profile.language === 'ar';
+    const langLocale = isArabic ? 'ar-SA' : 'en-US';
+    let userTz = profile.timeZone || 'Asia/Riyadh';
+    try {
+      userTz = Intl.DateTimeFormat().resolvedOptions().timeZone || userTz;
+    } catch (_) {}
+
+    let dayOfWeek = now.toLocaleDateString(langLocale, { weekday: 'long' });
+    let formattedDate = now.toLocaleDateString(langLocale, { year: 'numeric', month: 'long', day: 'numeric' });
+    let formattedTime = now.toLocaleTimeString(langLocale, { hour: '2-digit', minute: '2-digit', hour12: true });
+    let time24 = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+    const clientTimeContext = {
+      timeZone: userTz,
+      isoTimestamp: now.toISOString(),
+      dayOfWeek,
+      formattedDate,
+      formattedTime,
+      time24,
+    };
+
     try {
       const response = await fetch('/api/companion/chat-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
-          history: updatedMessages.map((m) => ({ sender: m.sender, text: m.text })),
+          history: updatedMessages.map((m) => ({ sender: m.sender, text: m.text, timestamp: m.timestamp })),
           profile,
           items,
           mediaBase64: media?.base64,
           mediaMimeType: media?.mimeType,
+          clientTimeContext,
         }),
       });
 
@@ -317,14 +345,16 @@ export default function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenPermissions={() => setIsPermissionsOpen(true)}
         onOpenSubscription={() => setIsSubscriptionOpen(true)}
+        onOpenMaritalSupport={() => setIsMaritalSupportOpen(true)}
       />
 
-      <main className="flex-1 max-w-4xl w-full mx-auto p-2">
+      <main className="flex-1 max-w-4xl w-full mx-auto p-2 pb-[65px]">
         {activeTab === 'companion' && (
           <CompanionView
             messages={messages}
             profile={profile}
             items={items}
+            onOpenMaritalSupport={() => setIsMaritalSupportOpen(true)}
             onSendMessage={handleSendMessage}
             isLoading={isLoadingAI}
             onOpenPermissions={() => setIsPermissionsOpen(true)}
@@ -382,6 +412,39 @@ export default function App() {
           onClose={() => setIsSettingsOpen(false)}
           onClearMemory={handleClearMemory}
           onExportData={handleExportData}
+          onOpenMaritalSupport={() => {
+            setIsSettingsOpen(false);
+            setIsMaritalSupportOpen(true);
+          }}
+          onOpenAuth={() => {
+            setIsSettingsOpen(false);
+            setIsAuthOpen(true);
+          }}
+        />
+      )}
+
+      {isAuthOpen && (
+        <AuthModal
+          profile={profile}
+          onClose={() => setIsAuthOpen(false)}
+          onLoginSuccess={(userData) => {
+            if (userData.accountId || userData.id) {
+              handleUpdateProfile({
+                ...profile,
+                id: userData.accountId || userData.id,
+                addressAs: userData.name || profile.addressAs,
+              });
+            }
+          }}
+        />
+      )}
+
+      {isMaritalSupportOpen && (
+        <MaritalCounselingModal
+          isOpen={isMaritalSupportOpen}
+          onClose={() => setIsMaritalSupportOpen(false)}
+          profile={profile}
+          onUpdateProfile={handleUpdateProfile}
         />
       )}
 

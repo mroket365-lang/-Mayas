@@ -20,6 +20,11 @@ export const defaultProfile: UserProfile = {
   onboardingCompleted: false,
   dailyMessageLimit: 5,
   timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Riyadh',
+  privateCandidMode: false,
+  specialCounselingEnabled: false,
+  specialCounselingVerified18: false,
+  specialCounselingExpiresAt: undefined,
+  specialCounselingLastActivatedDate: undefined,
 };
 
 export const storageService = {
@@ -57,13 +62,18 @@ export const storageService = {
     try {
       localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(items));
     } catch (e) {
-      console.error('Failed to save items:', e);
+      console.warn('Failed to save items:', e);
+      try {
+        // Fallback: prune completed items if quota exceeded
+        const activeItems = items.filter(i => i.status !== 'completed');
+        localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(activeItems));
+      } catch (_) {}
     }
   },
 
   addItem(item: CompanionItem): CompanionItem[] {
     const items = this.getItems();
-    // Check duplicate title & type within 1 hour to prevent accidental duplicate additions
+    // Check duplicate title & type within pending items
     const duplicate = items.find(
       i => i.type === item.type && i.title.trim().toLowerCase() === item.title.trim().toLowerCase() && i.status === 'pending'
     );
@@ -101,16 +111,52 @@ export const storageService = {
   },
 
   saveMessages(messages: ChatMessage[]): void {
+    // 1. Sanitize messages for storage: keep last 150 messages & strip heavy base64 mediaUrl strings
+    let toSave: ChatMessage[] = messages.slice(-150).map(m => {
+      if (m.mediaUrl && m.mediaUrl.length > 2000) {
+        // Exclude heavy base64 data string from persistent localStorage
+        const { mediaUrl, ...rest } = m;
+        return rest;
+      }
+      return m;
+    });
+
+    // 2. Progressive saving with fallback handling for QuotaExceededError
     try {
-      localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(messages));
+      localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(toSave));
     } catch (e) {
-      console.error('Failed to save messages:', e);
+      console.warn('Initial saveMessages failed (quota exceeded). Pruning old history...');
+      try {
+        // Prune to last 70 messages
+        toSave = toSave.slice(-70);
+        localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(toSave));
+      } catch (e2) {
+        try {
+          // Prune to last 30 messages
+          toSave = toSave.slice(-30);
+          localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(toSave));
+        } catch (e3) {
+          try {
+            // Strip all media metadata & keep last 15 text-only messages
+            toSave = toSave.slice(-15).map(m => ({
+              id: m.id,
+              sender: m.sender,
+              text: m.text,
+              timestamp: m.timestamp
+            }));
+            localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(toSave));
+          } catch (e4) {
+            console.error('Storage quota severely exceeded, unable to persist messages:', e4);
+          }
+        }
+      }
     }
   },
 
   addMessage(msg: ChatMessage): ChatMessage[] {
     const msgs = this.getMessages();
-    const updated = [...msgs, msg];
+    const exists = msgs.some(m => m.id === msg.id);
+    const updated = exists ? msgs.map(m => (m.id === msg.id ? msg : m)) : [...msgs, msg];
     this.saveMessages(updated);
     return updated;
   },

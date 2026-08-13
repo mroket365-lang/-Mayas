@@ -22,6 +22,8 @@ import {
   Radio,
   Copy,
   Scissors,
+  Flame,
+  HeartHandshake,
 } from 'lucide-react';
 import { speechService } from '../services/speechService';
 import { AudioWaveform } from './AudioWaveform';
@@ -31,6 +33,7 @@ interface CompanionViewProps {
   messages: ChatMessage[];
   profile: UserProfile;
   items: CompanionItem[];
+  onOpenMaritalSupport?: () => void;
   onSendMessage: (
     text: string,
     media?: { base64: string; mimeType: string; name: string; type: 'image' | 'video' | 'audio' }
@@ -207,6 +210,8 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(({
 export const CompanionView: React.FC<CompanionViewProps> = ({
   messages,
   profile,
+  items,
+  onOpenMaritalSupport,
   onSendMessage,
   isLoading,
   onOpenPermissions,
@@ -265,17 +270,27 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
 
   const [thinkingIndex, setThinkingIndex] = useState(0);
 
+  const companionName =
+    profile.displayName ||
+    (profile.language === 'ar'
+      ? profile.companionGender === 'female'
+        ? 'رفيقتك'
+        : 'رفيقك'
+      : 'Companion');
+
+  const isFemale = profile.companionGender === 'female';
+
   const arThinkingPhrases = [
-    'الرفيق يفكر...',
-    'الرفيق يكتب...',
+    `${companionName} ${isFemale ? 'تفكر' : 'يفكر'}...`,
+    `${companionName} ${isFemale ? 'تكتب' : 'يكتب'}...`,
     'جاري تحليل الطلب...',
-    'يجهز الرد بدقة...',
-    'الرفيق يراجع التفاصيل...',
+    `${isFemale ? 'تجهز' : 'يجهز'} الرد بدقة...`,
+    `${companionName} ${isFemale ? 'تراجع' : 'يراجع'} التفاصيل...`,
   ];
 
   const enThinkingPhrases = [
-    'Companion is thinking...',
-    'Companion is typing...',
+    `${companionName} is thinking...`,
+    `${companionName} is typing...`,
     'Analyzing request...',
     'Preparing response...',
     'Checking details...',
@@ -306,11 +321,15 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
     const isNewMessage = messages.length !== prevMsgLengthRef.current;
     prevMsgLengthRef.current = messages.length;
 
-    // Smooth scroll for new messages, instant scroll for streaming updates to avoid shaking
-    messagesEndRef.current.scrollIntoView({
-      behavior: isNewMessage ? 'smooth' : 'auto',
-      block: 'end',
-    });
+    // Smooth scroll for new messages, instant scroll for streaming updates
+    const timer = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({
+        behavior: isNewMessage ? 'smooth' : 'auto',
+        block: 'end',
+      });
+    }, 50);
+
+    return () => clearTimeout(timer);
   }, [messages.length, isLoading, messages[messages.length - 1]?.text]);
 
   const handleSend = async (e?: React.FormEvent) => {
@@ -533,8 +552,42 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
 
   return (
     <div className="flex flex-col h-[calc(100vh-125px)] max-w-2xl mx-auto relative">
+      {(profile.privateCandidMode || profile.personality === 'bold') && (
+        <div className="mx-3 mt-2 px-3.5 py-2 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-rose-500/15 border border-amber-500/30 text-[11px] font-bold text-amber-600 dark:text-amber-400 flex items-center justify-between gap-2 shadow-sm animate-fade-in shrink-0">
+          <div className="flex items-center gap-2">
+            <Flame className="w-4 h-4 text-amber-500 animate-pulse shrink-0" />
+            <span>
+              {profile.language === 'ar'
+                ? 'نمط الحوارات الخاصة والصريحة مفعّل: الذكاء الاصطناعي يتفاعل معك بجرأة وصدق وشفافية تامّة.'
+                : 'Private Candid Mode Enabled: Bold, direct & transparent AI responses active.'}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {profile.specialCounselingEnabled &&
+        profile.specialCounselingExpiresAt &&
+        new Date(profile.specialCounselingExpiresAt).getTime() > Date.now() && (
+          <div
+            onClick={onOpenMaritalSupport}
+            className="mx-3 mt-2 px-3.5 py-2 rounded-2xl bg-gradient-to-r from-rose-500/15 via-pink-500/15 to-amber-500/15 border border-rose-500/40 text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center justify-between gap-2 shadow-sm animate-fade-in shrink-0 cursor-pointer hover:border-rose-500 transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <HeartHandshake className="w-4 h-4 text-rose-500 animate-pulse shrink-0" />
+              <span>
+                {profile.language === 'ar'
+                  ? 'جلسة الاستشارة والدعم الزوجي نشطة: يمكنك طرح أسئلتك حول العلاقة الحميمة بوضوح وصراحة للحصول على إرشادات مخصصة.'
+                  : 'Marital Support Session Active: Ask questions with complete clarity for direct guidance.'}
+              </span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-600 font-extrabold shrink-0">
+              {profile.language === 'ar' ? 'عرض الجلسة' : 'View'}
+            </span>
+          </div>
+        )}
+
       {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 pb-36">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 pb-12 sm:pb-16">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-4 animate-fade-in">
             <div className="p-4 rounded-3xl bg-[var(--accent-sage)]/10 text-[var(--accent-sage)]">
@@ -617,7 +670,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
       />
 
       {/* Bottom Text, Media, & Voice Bar positioned cleanly above BottomNav */}
-      <div className="fixed bottom-[60px] left-0 right-0 z-30 bg-[var(--bg-surface)] border-t border-[var(--border-color)] p-2.5 sm:p-3 shadow-lg">
+      <div className="shrink-0 z-30 bg-[var(--bg-surface)] border-t border-[var(--border-color)] p-2.5 sm:p-3 shadow-lg rounded-t-2xl sm:rounded-t-3xl">
         <div className="max-w-2xl mx-auto space-y-2">
           {/* Attachment Thumbnail Preview */}
           {attachedMedia && (

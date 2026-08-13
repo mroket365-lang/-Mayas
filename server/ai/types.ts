@@ -30,7 +30,17 @@ export type IntentCategory =
   | 'venting'
   | 'conversation'
   | 'schedule_query'
+  | 'time_query'
   | 'daily_review';
+
+export interface ClientTimeContext {
+  timeZone?: string;
+  isoTimestamp?: string;
+  dayOfWeek?: string;
+  formattedDate?: string;
+  formattedTime?: string;
+  time24?: string;
+}
 
 export interface IntentAnalysis {
   complexity: IntentComplexity;
@@ -42,11 +52,12 @@ export interface IntentAnalysis {
 
 export interface OrchestrationRequest {
   message: string;
-  history: { sender: 'user' | 'ai'; text: string }[];
+  history: { sender: 'user' | 'ai'; text: string; timestamp?: string }[];
   profile: UserProfile;
   items: CompanionItem[];
   mediaBase64?: string;
   mediaMimeType?: string;
+  clientTimeContext?: ClientTimeContext;
 }
 
 export interface OrchestrationResponse {

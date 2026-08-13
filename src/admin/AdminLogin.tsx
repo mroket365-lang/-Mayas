@@ -88,12 +88,6 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
             </div>
           </div>
 
-          <div className="p-3 bg-slate-950/50 rounded-xl border border-slate-800/60 text-xs text-slate-400 space-y-1">
-            <p className="font-semibold text-indigo-400">بيانات المسؤول الافتراضي / Default Credentials:</p>
-            <p className="font-mono">Email: admin@rafiq.ai</p>
-            <p className="font-mono">Password: AdminSecret2026!</p>
-          </div>
-
           <button
             type="submit"
             disabled={loading}

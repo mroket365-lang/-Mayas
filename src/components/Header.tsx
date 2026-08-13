@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, Moon, Sun, Sparkles, Globe, ShieldCheck, ChevronDown, Check, Crown } from 'lucide-react';
+import { Settings, Moon, Sun, Sparkles, Globe, ShieldCheck, ChevronDown, Check, Crown, Flame, HeartHandshake } from 'lucide-react';
 import { UserProfile, AppLanguage } from '../types';
 import { getTranslation, supportedLanguages } from '../locales/translations';
 
@@ -9,6 +9,7 @@ interface HeaderProps {
   onOpenSettings: () => void;
   onOpenPermissions: () => void;
   onOpenSubscription?: () => void;
+  onOpenMaritalSupport?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -17,6 +18,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onOpenPermissions,
   onOpenSubscription,
+  onOpenMaritalSupport,
 }) => {
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
   const langMenuRef = useRef<HTMLDivElement>(null);
@@ -51,26 +53,75 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
         <div>
           <h1 className="text-lg font-bold tracking-tight text-[var(--text-main)] flex items-center gap-2">
-            {profile.displayName || t.appName}
-            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+            {profile.displayName || (profile.language === 'ar' ? (profile.companionGender === 'female' ? 'رفيقتك' : 'رفيقك') : t.appName)}
+            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" title="Online / متصل"></span>
           </h1>
           <p className="text-xs text-[var(--text-muted)] font-medium">
-            {t.tagline}
+            {profile.language === 'ar'
+              ? profile.companionGender === 'female'
+                ? 'رفيقتك الذكية الشخصية'
+                : profile.companionGender === 'male'
+                ? 'رفيقك الذكي الشخصي'
+                : 'رفيقك الذكي الشخصي'
+              : profile.companionGender === 'female'
+              ? 'Your Personal AI Companion (Female)'
+              : profile.companionGender === 'male'
+              ? 'Your Personal AI Companion (Male)'
+              : t.tagline}
           </p>
         </div>
       </div>
 
       <div className="flex items-center gap-1.5 sm:gap-2">
-        {onOpenSubscription && (
+        {onOpenMaritalSupport && (
           <button
-            onClick={onOpenSubscription}
-            className="px-2.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 hover:bg-amber-500/20 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
-            title="الاشتراكات والترقية"
+            onClick={onOpenMaritalSupport}
+            className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm ${
+              profile.specialCounselingEnabled &&
+              profile.specialCounselingExpiresAt &&
+              new Date(profile.specialCounselingExpiresAt).getTime() > Date.now()
+                ? 'bg-rose-500/20 border-rose-500/50 text-rose-600 dark:text-rose-400 font-extrabold ring-1 ring-rose-500/30'
+                : 'border-rose-500/30 bg-rose-500/10 text-rose-600 hover:bg-rose-500/20'
+            }`}
+            title={profile.language === 'ar' ? 'جلسة الاستشارة والدعم الزوجي (18+)' : 'Marital Support Session (18+)'}
           >
-            <Crown className="w-4 h-4 text-amber-500" />
-            <span className="hidden sm:inline">الاشتراك</span>
+            <HeartHandshake className="w-4 h-4 text-rose-500 animate-pulse" />
+            <span className="hidden sm:inline">
+              {profile.language === 'ar' ? 'استشارة زوجية' : 'Marital Support'}
+            </span>
           </button>
         )}
+
+        {/* Private Candid Mode Toggle Button */}
+        <button
+          onClick={() =>
+            onUpdateProfile({
+              ...profile,
+              privateCandidMode: !(profile.privateCandidMode || profile.personality === 'bold'),
+            })
+          }
+          className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm ${
+            profile.privateCandidMode || profile.personality === 'bold'
+              ? 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-amber-500/50 text-amber-600 dark:text-amber-400 font-extrabold ring-1 ring-amber-500/30'
+              : 'border-transparent hover:border-[var(--border-color)] hover:bg-[var(--bg-hover)] text-[var(--text-muted)]'
+          }`}
+          title={
+            profile.language === 'ar'
+              ? 'تفعيل/إلغاء نمط الحوارات الخاصة والصريحة'
+              : 'Toggle Private Candid Conversations Mode'
+          }
+        >
+          <Flame
+            className={`w-4 h-4 ${
+              profile.privateCandidMode || profile.personality === 'bold'
+                ? 'text-amber-500 animate-pulse'
+                : 'text-[var(--text-muted)]'
+            }`}
+          />
+          <span className="hidden sm:inline">
+            {profile.language === 'ar' ? 'حوارات خاصة' : 'Candid'}
+          </span>
+        </button>
         <button
           onClick={onOpenPermissions}
           className="p-2 rounded-xl border border-transparent hover:border-[var(--border-color)] hover:bg-[var(--bg-hover)] text-[var(--text-main)] transition-all"

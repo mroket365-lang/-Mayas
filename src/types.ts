@@ -67,16 +67,24 @@ export type PersonalityType =
   | 'secretary' 
   | 'motivator' 
   | 'calm' 
-  | 'spontaneous';
+  | 'spontaneous'
+  | 'bold';
 
 export type ProactivityLevel = 'low' | 'medium' | 'high';
 
 export type AppLanguage = 'ar' | 'en' | 'zh' | 'hi' | 'ja' | 'de' | 'tr' | 'fr';
 
+export type CompanionGender = 'male' | 'female' | 'unspecified';
+
 export interface UserProfile {
   id?: string;
+  accountId?: string;
+  email?: string;
+  username?: string;
+  phone?: string;
   displayName: string;
   addressAs: string;
+  companionGender: CompanionGender;
   personality: PersonalityType;
   language: AppLanguage;
   proactivityLevel: ProactivityLevel;
@@ -87,6 +95,25 @@ export interface UserProfile {
   onboardingCompleted: boolean;
   dailyMessageLimit: number;
   timeZone: string;
+  privateCandidMode?: boolean;
+  specialCounselingEnabled?: boolean;
+  specialCounselingVerified18?: boolean;
+  specialCounselingExpiresAt?: string;
+  specialCounselingLastActivatedDate?: string;
+}
+
+export type FeatureVisibilityMode = 'hidden' | 'everyone' | 'specific_user' | 'allowed_users_list' | 'region';
+
+export interface FeatureFlagConfig {
+  mode: FeatureVisibilityMode;
+  allowedUserId?: string;
+  allowedUsersList?: string;
+  allowedRegion?: string;
+}
+
+export interface SystemFeaturePermissions {
+  privateCandidAllowed: boolean;
+  maritalSupportAllowed: boolean;
 }
 
 export interface DailyReport {

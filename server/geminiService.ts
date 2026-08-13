@@ -1,4 +1,5 @@
 import { CompanionItem, UserProfile, ActionSummary } from '../src/types';
+import { ClientTimeContext } from './ai/types.js';
 import {
   processOrchestratedChatStream,
   processOrchestratedChat,
@@ -7,12 +8,13 @@ import {
 
 export async function processCompanionChatStream(
   userMessage: string,
-  history: { sender: 'user' | 'ai'; text: string }[],
+  history: { sender: 'user' | 'ai'; text: string; timestamp?: string }[],
   profile: UserProfile,
   currentItems: CompanionItem[],
   onChunk: (chunkText: string) => void,
   mediaBase64?: string,
-  mediaMimeType?: string
+  mediaMimeType?: string,
+  clientTimeContext?: ClientTimeContext
 ): Promise<{
   replyText: string;
   actions: ActionSummary[];
@@ -27,6 +29,7 @@ export async function processCompanionChatStream(
       items: currentItems,
       mediaBase64,
       mediaMimeType,
+      clientTimeContext,
     },
     onChunk
   );
@@ -34,11 +37,12 @@ export async function processCompanionChatStream(
 
 export async function processCompanionChat(
   userMessage: string,
-  history: { sender: 'user' | 'ai'; text: string }[],
+  history: { sender: 'user' | 'ai'; text: string; timestamp?: string }[],
   profile: UserProfile,
   currentItems: CompanionItem[],
   mediaBase64?: string,
-  mediaMimeType?: string
+  mediaMimeType?: string,
+  clientTimeContext?: ClientTimeContext
 ): Promise<{
   replyText: string;
   actions: ActionSummary[];
@@ -52,6 +56,7 @@ export async function processCompanionChat(
     items: currentItems,
     mediaBase64,
     mediaMimeType,
+    clientTimeContext,
   });
 }
 

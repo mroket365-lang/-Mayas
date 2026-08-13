@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { UserProfile, PersonalityType, ProactivityLevel, AppLanguage } from '../types';
+import { UserProfile, PersonalityType, ProactivityLevel, AppLanguage, CompanionGender } from '../types';
 import { getTranslation, supportedLanguages } from '../locales/translations';
-import { Sparkles, Heart, CheckCircle2, Globe } from 'lucide-react';
+import { Sparkles, Heart, CheckCircle2, Globe, UserCheck } from 'lucide-react';
 
 interface OnboardingModalProps {
   profile: UserProfile;
@@ -12,6 +12,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ profile, onCom
   const [lang, setLang] = useState<AppLanguage>(profile.language);
   const [addressAs, setAddressAs] = useState(profile.addressAs || (profile.language === 'ar' ? 'يا غالي' : 'My friend'));
   const [persona, setPersona] = useState<PersonalityType>(profile.personality);
+  const [companionGender, setCompanionGender] = useState<CompanionGender>(profile.companionGender || 'male');
   const [proactivity, setProactivity] = useState<ProactivityLevel>(profile.proactivityLevel);
 
   const t = getTranslation(lang);
@@ -31,6 +32,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ profile, onCom
       language: lang,
       addressAs,
       personality: persona,
+      companionGender,
       proactivityLevel: proactivity,
       onboardingCompleted: true,
     });
@@ -107,6 +109,53 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ profile, onCom
                 <span className="text-xs opacity-75 font-normal mt-1">{p.desc}</span>
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Companion Gender Selection (مذكر / مؤنث / غير مهم) */}
+        <div className="space-y-2">
+          <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+            {t.chooseCompanionGender || 'هل تريد رفيقك يتحدث معك بكونه ذكر أم انثى؟'}
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => setCompanionGender('male')}
+              className={`p-3 rounded-2xl border text-xs font-bold text-center transition-all flex flex-col items-center justify-center gap-1 ${
+                companionGender === 'male'
+                  ? 'border-[var(--accent-sage)] bg-[var(--accent-sage)]/10 text-[var(--accent-sage)] font-extrabold shadow-sm'
+                  : 'border-[var(--border-color)] text-[var(--text-main)] hover:bg-[var(--bg-hover)]'
+              }`}
+            >
+              <span className="text-base">👨‍💼</span>
+              <span>{t.genderMale || 'مذكر'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCompanionGender('female')}
+              className={`p-3 rounded-2xl border text-xs font-bold text-center transition-all flex flex-col items-center justify-center gap-1 ${
+                companionGender === 'female'
+                  ? 'border-[var(--accent-sage)] bg-[var(--accent-sage)]/10 text-[var(--accent-sage)] font-extrabold shadow-sm'
+                  : 'border-[var(--border-color)] text-[var(--text-main)] hover:bg-[var(--bg-hover)]'
+              }`}
+            >
+              <span className="text-base">👩‍💼</span>
+              <span>{t.genderFemale || 'مؤنث'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCompanionGender('unspecified')}
+              className={`p-3 rounded-2xl border text-xs font-bold text-center transition-all flex flex-col items-center justify-center gap-1 ${
+                companionGender === 'unspecified'
+                  ? 'border-[var(--accent-sage)] bg-[var(--accent-sage)]/10 text-[var(--accent-sage)] font-extrabold shadow-sm'
+                  : 'border-[var(--border-color)] text-[var(--text-main)] hover:bg-[var(--bg-hover)]'
+              }`}
+            >
+              <span className="text-base">🤝</span>
+              <span>{t.genderUnspecified || 'غير مهم'}</span>
+            </button>
           </div>
         </div>
 

@@ -33,12 +33,21 @@ export const translations = {
     onboardingSubtitle: 'تحدث معي بطبيعتك عن يومك، أفكارك، مواعيدك ومهامك. أنا هنا لأتذكر معك وأساعدك.',
     chooseLanguage: 'اختر اللغة',
     choosePersona: 'كيف تحب أن يكون رفيقك؟',
+    chooseCompanionGender: 'هل تريد رفيقك يتحدث معك بكونه ذكر أم انثى؟',
+    genderMale: 'مذكر (ذكر)',
+    genderFemale: 'مؤنث (انثى)',
+    genderUnspecified: 'غير مهم',
+    accountIdLabel: 'معرّف الحساب (ID)',
+    loginOrCreateAccount: 'حساب المستخدم وتسجيل الدخول',
     personaCloseFriend: 'صديق مقرب',
     personaBrotherSister: 'أخ / أخت',
     personaSecretary: 'سكرتير شخصي',
     personaMotivator: 'محفز ومشجع',
     personaCalm: 'هادئ ومستمع',
     personaSpontaneous: 'عفوي وبسيط',
+    personaBold: 'جريء وصريح جداً',
+    privateCandidTitle: 'نمط الحوارات الخاصة والصريحة',
+    privateCandidDesc: 'عند تفعيل هذا النمط، يتحدث الذكاء الاصطناعي بجرأة وصراحة تامة ويجيب على كافة أسئلتك بوضوح وصدق بدون تحفظ.',
     howToAddressYou: 'كيف تحب أن يناديك رفيقك؟',
     addressPlaceholder: 'مثال: يا غالي، يا حبيبي، يا صديقي',
     proactivityTitle: 'مستوى المبادرة',
@@ -156,6 +165,9 @@ export const translations = {
     personaMotivator: 'Motivator',
     personaCalm: 'Calm Listener',
     personaSpontaneous: 'Spontaneous',
+    personaBold: 'Bold & Direct',
+    privateCandidTitle: 'Private Candid Conversations Mode',
+    privateCandidDesc: 'Enables bold, candid, and direct responses to any question with complete clarity, open-mindedness, and sincerity.',
     howToAddressYou: 'How should Rafiq address you?',
     addressPlaceholder: 'e.g. My friend, Alex, Buddy',
     proactivityTitle: 'Proactivity Level',
@@ -911,5 +923,5 @@ export const translations = {
 };
 
 export function getTranslation(lang: AppLanguage) {
-  return translations[lang] || translations.ar;
+  return { ...translations.ar, ...(translations[lang] || {}) };
 }

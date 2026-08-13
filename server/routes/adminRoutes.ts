@@ -49,23 +49,33 @@ adminRouter.post('/login', (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
-  // Verify Admin credentials
-  const defaultAdmin = db.findUserByEmail('admin@rafiq.ai') || db.getUsers().find((u) => u.role === 'super_admin');
-  
-  if (
-    (email.toLowerCase() === 'admin@rafiq.ai' && password === 'AdminSecret2026!') ||
-    (defaultAdmin && defaultAdmin.email.toLowerCase() === email.toLowerCase() && password === 'AdminSecret2026!')
-  ) {
-    const adminUser = defaultAdmin || {
-      id: 'admin_super_01',
-      email: 'admin@rafiq.ai',
-      name: 'Super Admin',
-      role: 'super_admin' as const,
-      status: 'active' as const,
-      createdAt: new Date().toISOString(),
-      lastActiveAt: new Date().toISOString(),
-      currency: 'USD',
-    };
+  const settings = db.getSettings();
+  const storedAdminEmail = settings.superAdminEmail || 'admin@rafiq.ai';
+  const storedAdminPassword = settings.superAdminPassword || 'AdminSecret2026!';
+
+  // Check super admin or assistant managers in DB
+  const isSuperAdmin =
+    email.trim().toLowerCase() === storedAdminEmail.toLowerCase() && password === storedAdminPassword;
+
+  const assistantUser = db.getUsers().find(
+    (u) =>
+      (u.role === 'admin' || u.role === 'assistant') &&
+      u.email.toLowerCase() === email.trim().toLowerCase() &&
+      u.passwordHash === password
+  );
+
+  if (isSuperAdmin || assistantUser) {
+    const adminUser = isSuperAdmin
+      ? {
+          id: 'admin_super_01',
+          email: storedAdminEmail,
+          name: 'Super Admin',
+          role: 'super_admin' as const,
+          status: 'active' as const,
+          createdAt: new Date().toISOString(),
+          lastActiveAt: new Date().toISOString(),
+        }
+      : assistantUser!;
 
     const token = generateAdminToken();
     activeAdminSessions.set(token, {
@@ -79,7 +89,7 @@ adminRouter.post('/login', (req: Request, res: Response) => {
       adminId: adminUser.id,
       adminEmail: adminUser.email,
       action: 'ADMIN_LOGIN',
-      details: 'Admin logged into Admin Panel successfully.',
+      details: `Admin/Assistant (${adminUser.role}) logged in successfully.`,
       ipAddress: req.ip,
     });
 
@@ -91,11 +101,12 @@ adminRouter.post('/login', (req: Request, res: Response) => {
         email: adminUser.email,
         name: adminUser.name,
         role: adminUser.role,
+        permissions: (adminUser as any).permissions || [],
       },
     });
   }
 
-  return res.status(401).json({ error: 'Invalid admin credentials' });
+  return res.status(401).json({ error: 'بيانات تسجيل الدخول الخاصة بالإدارة غير صحيحة' });
 });
 
 // 2. Verify Session Token
@@ -527,7 +538,15 @@ adminRouter.get('/settings', requireAdminAuth, (req: Request, res: Response) => 
 });
 
 adminRouter.put('/settings', requireAdminAuth, requireSuperAdmin, (req: Request, res: Response) => {
-  const { maintenanceMode, newRegistrationsEnabled, defaultPlan, multiAIEnabled, voiceEnabled } = req.body;
+  const {
+    maintenanceMode,
+    newRegistrationsEnabled,
+    defaultPlan,
+    multiAIEnabled,
+    voiceEnabled,
+    privateCandidVisibility,
+    maritalSupportVisibility,
+  } = req.body;
   const session = (req as any).adminSession;
 
   const updated = db.updateSettings({
@@ -536,6 +555,8 @@ adminRouter.put('/settings', requireAdminAuth, requireSuperAdmin, (req: Request,
     defaultPlan: defaultPlan || undefined,
     multiAIEnabled: multiAIEnabled !== undefined ? Boolean(multiAIEnabled) : undefined,
     voiceEnabled: voiceEnabled !== undefined ? Boolean(voiceEnabled) : undefined,
+    privateCandidVisibility: privateCandidVisibility || undefined,
+    maritalSupportVisibility: maritalSupportVisibility || undefined,
   });
 
   db.addAuditLog({
@@ -546,4 +567,83 @@ adminRouter.put('/settings', requireAdminAuth, requireSuperAdmin, (req: Request,
   });
 
   return res.json(updated);
+});
+
+// 13. Secure Admin Credentials Update
+adminRouter.post('/change-credentials', requireAdminAuth, requireSuperAdmin, (req: Request, res: Response) => {
+  const { newEmail, newPassword } = req.body;
+  const session = (req as any).adminSession;
+
+  if (!newEmail || !newPassword) {
+    return res.status(400).json({ error: 'البريد الإلكتروني وكلمة السر الجديدة مطلوبان' });
+  }
+
+  db.updateSettings({
+    superAdminEmail: newEmail.trim().toLowerCase(),
+    superAdminPassword: newPassword,
+  });
+
+  db.addAuditLog({
+    adminId: session.adminId,
+    adminEmail: session.email,
+    action: 'CHANGE_ADMIN_CREDENTIALS',
+    details: `Changed super admin email to ${newEmail} and updated password securely.`,
+  });
+
+  return res.json({ success: true, message: 'تم تحديث بيانات دخول المسؤول بنجاح' });
+});
+
+// 14. Assistants & Managers Management
+adminRouter.get('/assistants', requireAdminAuth, requireSuperAdmin, (req: Request, res: Response) => {
+  const assistants = db.getUsers().filter((u) => u.role === 'admin' || u.role === 'assistant');
+  return res.json(assistants);
+});
+
+adminRouter.post('/assistants', requireAdminAuth, requireSuperAdmin, (req: Request, res: Response) => {
+  const { email, password, name, permissions } = req.body;
+  const session = (req as any).adminSession;
+
+  if (!email || !password || !name) {
+    return res.status(400).json({ error: 'الاسم، البريد الإلكتروني، وكلمة المرور مطلوبة' });
+  }
+
+  const newAssistant: UserEntity = {
+    id: `adm_assist_${Date.now().toString(36)}`,
+    email: email.trim().toLowerCase(),
+    passwordHash: password,
+    name: name.trim(),
+    role: 'assistant',
+    status: 'active',
+    permissions: Array.isArray(permissions) ? permissions : ['users_view', 'stats_view'],
+    createdAt: new Date().toISOString(),
+    lastActiveAt: new Date().toISOString(),
+  };
+
+  db.upsertUser(newAssistant);
+
+  db.addAuditLog({
+    adminId: session.adminId,
+    adminEmail: session.email,
+    action: 'ADD_ASSISTANT_ADMIN',
+    details: `Added new assistant admin: ${name} (${email}).`,
+  });
+
+  return res.json(newAssistant);
+});
+
+adminRouter.delete('/assistants/:id', requireAdminAuth, requireSuperAdmin, (req: Request, res: Response) => {
+  const assistantId = req.params.id;
+  const session = (req as any).adminSession;
+
+  const users = db.getUsers().filter((u) => u.id !== assistantId);
+  db.saveUsers(users);
+
+  db.addAuditLog({
+    adminId: session.adminId,
+    adminEmail: session.email,
+    action: 'DELETE_ASSISTANT_ADMIN',
+    details: `Removed assistant admin ID: ${assistantId}.`,
+  });
+
+  return res.json({ success: true, message: 'تم حذف المساعد بنجاح' });
 });

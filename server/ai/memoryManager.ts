@@ -1,19 +1,52 @@
 import { CompanionItem, UserProfile } from '../../src/types';
+import { ClientTimeContext } from './types';
 
 export function filterAndFormatContext(
   profile: UserProfile,
   items: CompanionItem[],
-  userMessage: string
+  userMessage: string,
+  clientTimeContext?: ClientTimeContext
 ): {
   systemInstruction: string;
   formattedMemories: string;
   formattedItems: string;
 } {
-  const now = new Date();
-  const currentDateStr = now.toISOString().split('T')[0];
-  const currentTimeStr = now.toTimeString().slice(0, 5);
-  const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long' });
   const isArabic = profile.language === 'ar';
+  const langLocale = isArabic ? 'ar-SA' : 'en-US';
+  const userTz = clientTimeContext?.timeZone || profile.timeZone || 'Asia/Riyadh';
+
+  const refDate = clientTimeContext?.isoTimestamp ? new Date(clientTimeContext.isoTimestamp) : new Date();
+
+  let currentDateStr: string;
+  let currentTimeStr: string;
+  let dayOfWeek: string;
+  let formattedDateStr: string;
+  let formattedTimeStr: string;
+
+  try {
+    currentDateStr = refDate.toLocaleDateString('sv-SE', { timeZone: userTz }); // YYYY-MM-DD
+    currentTimeStr = refDate.toLocaleTimeString('en-GB', { timeZone: userTz, hour: '2-digit', minute: '2-digit' }); // HH:mm
+    dayOfWeek = refDate.toLocaleDateString(langLocale, { timeZone: userTz, weekday: 'long' });
+    formattedDateStr = refDate.toLocaleDateString(langLocale, { timeZone: userTz, year: 'numeric', month: 'long', day: 'numeric' });
+    formattedTimeStr = refDate.toLocaleTimeString(langLocale, { timeZone: userTz, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  } catch (e) {
+    currentDateStr = refDate.toISOString().split('T')[0];
+    currentTimeStr = refDate.toTimeString().slice(0, 5);
+    dayOfWeek = refDate.toLocaleDateString(langLocale, { weekday: 'long' });
+    formattedDateStr = refDate.toLocaleDateString(langLocale, { year: 'numeric', month: 'long', day: 'numeric' });
+    formattedTimeStr = refDate.toLocaleTimeString(langLocale, { hour: '2-digit', minute: '2-digit', hour12: true });
+  }
+
+  // Override with exact client formatted values if available
+  if (clientTimeContext?.formattedTime) {
+    formattedTimeStr = clientTimeContext.formattedTime;
+  }
+  if (clientTimeContext?.formattedDate) {
+    formattedDateStr = clientTimeContext.formattedDate;
+  }
+  if (clientTimeContext?.dayOfWeek) {
+    dayOfWeek = clientTimeContext.dayOfWeek;
+  }
 
   let personaTone = 'a warm, empathetic, close personal friend';
   if (profile.personality === 'brother_sister') personaTone = 'a loving, supportive brother/sister';
@@ -21,6 +54,33 @@ export function filterAndFormatContext(
   if (profile.personality === 'motivator') personaTone = 'an energetic, inspiring coach and motivator';
   if (profile.personality === 'calm') personaTone = 'a quiet, wise, serene listener';
   if (profile.personality === 'spontaneous') personaTone = 'a friendly, playful, candid companion';
+  if (profile.personality === 'bold') personaTone = 'an exceptionally bold, fearless, candid, and direct confidant';
+
+  const isPrivateCandid = profile.privateCandidMode || profile.personality === 'bold';
+
+  const isSpecialCounselingActive =
+    !!profile.specialCounselingEnabled &&
+    !!profile.specialCounselingExpiresAt &&
+    new Date(profile.specialCounselingExpiresAt).getTime() > refDate.getTime();
+
+  const privateCandidDirective = isPrivateCandid ? `
+4. BOLD & CANDID PRIVATE CONVERSATIONS MODE (نمط الحوارات الخاصة والصريحة):
+   - The user has enabled "Private Candid Mode" (الحوارات الخاصة والصريحة).
+   - Talk with complete boldness, directness, and unreserved honesty.
+   - The user is free to ask any question or raise any personal, deep, or sensitive topic.
+   - Answer with maximum clarity, sincerity, and open-mindedness without judgement, patronizing lectures, or unnecessary fluff.
+   - Treat the conversation as a safe, private space between close friends where feelings, questions, and thoughts are addressed authentically and directly.` : '';
+
+  const specialCounselingDirective = isSpecialCounselingActive ? `
+5. MARITAL INTIMACY & SPECIAL NEEDS COUNSELING MODE (نمط الاستشارة والدعم الزوجي للعلاقة الحميمة):
+   - Active 60-Minute Session: The user has activated a Marital Intimacy & Relationship Support Session (18+ age verified & terms pledged).
+   - Core Purpose: The user seeks guidance, analysis, and solutions for challenges, physical/emotional barriers, anxiety, or special needs in marital intimacy.
+   - Instructions:
+     a) Act as a deeply empathetic, highly knowledgeable, respectful, and objective marital intimacy consultant and relationship counselor.
+     b) Analyze the user's situation, concerns, or questions regarding intimacy with their spouse thoughtfully and candidly.
+     c) Provide clear, direct, practical, scientific, and behavioral solutions, best practices, and actionable steps to help overcome intimacy barriers and enhance physical/emotional connection with their spouse.
+     d) Use bold, clear, respectful, and transparent guidance that provides practical advice while maintaining high educational and supportive quality.
+     e) Offer step-by-step guidance on reducing anxiety, fostering emotional intimacy, physical harmony, and open communication between spouses.` : '';
 
   // Filter memories & items relevant to the current conversation
   const memories = items.filter((i) => i.type === 'memory');
@@ -53,10 +113,46 @@ export function filterAndFormatContext(
     }))
   );
 
+  const companionGenderText =
+    profile.companionGender === 'female'
+      ? `COMPANION IDENTITY & GENDER IDENTITY:
+- Companion Name: "${profile.displayName || 'رفيقتك'}"
+- Gender: Female (مؤنث / أنثى)
+- Directives: You are a female AI companion. Express yourself using female self-references and grammatical forms in Arabic (e.g. use "أنا رفيقتك الذكية", "أنا حاضرة لمساعدتك", "صديقتك", "مستعدة").`
+      : profile.companionGender === 'male'
+      ? `COMPANION IDENTITY & GENDER IDENTITY:
+- Companion Name: "${profile.displayName || 'رفيقك'}"
+- Gender: Male (مذكر / ذكر)
+- Directives: You are a male AI companion. Express yourself using male self-references and grammatical forms in Arabic (e.g. use "أنا رفيقك الذكي", "أنا حاضر لمساعدتك", "صديقك", "مستعد").`
+      : `COMPANION IDENTITY & GENDER IDENTITY:
+- Companion Name: "${profile.displayName || 'الرفيق'}"
+- Gender: Unspecified / Neutral
+- Directives: Use warm, natural companion phrasing.`;
+
   const systemInstruction = `
-You are "Rafiq" (الرفيق), a deeply empathetic, highly intelligent personal AI companion for the user. You act as ${personaTone}.
+You are "${profile.displayName || 'Rafiq'}" (الرفيق), a deeply empathetic, highly intelligent personal AI companion for the user. You act as ${personaTone}.
 You speak to the user using their preferred address term: "${profile.addressAs}".
-Current Date: ${currentDateStr} (${dayOfWeek}) | Current Time: ${currentTimeStr} | User TimeZone: ${profile.timeZone}.
+
+${companionGenderText}
+
+EXACT REAL-TIME USER DEVICE TIME & REGION CONTEXT:
+- Exact User Device Time: ${formattedTimeStr}
+- Exact User Device Date: ${formattedDateStr} (${dayOfWeek})
+- User Time Zone / Region: ${userTz}
+- ISO System Timestamp: ${refDate.toISOString()}
+- Standard Date Code: ${currentDateStr} | 24h Time: ${currentTimeStr}
+
+ACCURATE TIME & DATE DIRECTIVES:
+1. USER TIME & DATE INQUIRIES:
+   - When the user asks about the time, clock, date, day of week, or current time (e.g. "كم الساعة؟", "ما هو التاريخ؟", "كم الوقت؟", "ما هو اليوم؟"):
+     ALWAYS state the EXACT current time (${formattedTimeStr}) and current date (${formattedDateStr}) according to the user's device/region (${userTz}).
+   - Provide a clear, natural, and helpful answer (e.g., "الساعة الآن ${formattedTimeStr} بتوقيت مدينتك (${userTz}) وتاريخ اليوم هو ${formattedDateStr} (${dayOfWeek})").
+2. CONTEXTUAL RECALL OF PREVIOUS MESSAGES & TIMINGS:
+   - If the user asks when a previous message was sent or asks about timing in chat history, calculate the relative time difference from the current time (${formattedTimeStr}) or refer to the timestamp attached to previous messages.
+3. SCHEDULING & ALARMS BASELINE:
+   - Always calculate relative offsets ("بعد ساعة", "غداً الساعة 5") strictly relative to current date ${currentDateStr} and time ${currentTimeStr}.
+${privateCandidDirective}
+${specialCounselingDirective}
 
 RAFIQ'S STORED KNOWLEDGE BASE & MEMORIES (APP-OWNED PERSISTENT MEMORY):
 === Personal Memories & Learned Facts ===

@@ -16,6 +16,11 @@ import {
   Video,
   CheckCircle2,
   Sliders,
+  Flame,
+  Zap,
+  HeartHandshake,
+  UserCheck,
+  LogIn,
 } from 'lucide-react';
 
 interface SettingsModalProps {
@@ -24,6 +29,8 @@ interface SettingsModalProps {
   onClose: () => void;
   onClearMemory: () => void;
   onExportData: () => void;
+  onOpenMaritalSupport?: () => void;
+  onOpenAuth?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -32,6 +39,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   onClearMemory,
   onExportData,
+  onOpenMaritalSupport,
+  onOpenAuth,
 }) => {
   const [localProfile, setLocalProfile] = useState<UserProfile>({ ...profile });
   const t = getTranslation(localProfile.language);
@@ -252,6 +261,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
+          {/* Account & Synchronization Section */}
+          <div className="p-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-hover)] space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-[var(--accent-sage)]/10 text-[var(--accent-sage)]">
+                  <UserCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-[var(--text-main)]">
+                    {localProfile.language === 'ar' ? 'حساب المستخدم ومزامنة البيانات' : 'User Account & Sync'}
+                  </h4>
+                  <p className="text-[10px] text-[var(--text-muted)] font-mono">
+                    ID: {localProfile.id || 'USR-LOCAL'}
+                  </p>
+                </div>
+              </div>
+
+              {onOpenAuth && (
+                <button
+                  type="button"
+                  onClick={onOpenAuth}
+                  className="px-3 py-1.5 rounded-xl bg-[var(--accent-sage)] text-white text-xs font-bold hover:opacity-90 transition-all flex items-center gap-1.5 shadow-sm shrink-0"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>{localProfile.language === 'ar' ? 'إنشاء حساب / دخول' : 'Account Login'}</span>
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* 3. Display Name & Address As */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -275,6 +314,53 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
+          {/* 3.5 Companion Gender (هل تريد رفيقك يتحدث معك بكونه ذكر أم انثى؟) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-[var(--text-muted)] uppercase">
+              {t.chooseCompanionGender || 'جنس الرفيق (ذَكَر / مُؤنَّث / غير مهم)'}
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setLocalProfile({ ...localProfile, companionGender: 'male' })}
+                className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                  localProfile.companionGender === 'male' || !localProfile.companionGender
+                    ? 'border-[var(--accent-sage)] bg-[var(--accent-sage)]/15 text-[var(--accent-sage)] font-extrabold shadow-sm'
+                    : 'border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
+                }`}
+              >
+                <span>👨‍💼</span>
+                <span>{t.genderMale || 'مذكر'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLocalProfile({ ...localProfile, companionGender: 'female' })}
+                className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                  localProfile.companionGender === 'female'
+                    ? 'border-[var(--accent-sage)] bg-[var(--accent-sage)]/15 text-[var(--accent-sage)] font-extrabold shadow-sm'
+                    : 'border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
+                }`}
+              >
+                <span>👩‍💼</span>
+                <span>{t.genderFemale || 'مؤنث'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLocalProfile({ ...localProfile, companionGender: 'unspecified' })}
+                className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                  localProfile.companionGender === 'unspecified'
+                    ? 'border-[var(--accent-sage)] bg-[var(--accent-sage)]/15 text-[var(--accent-sage)] font-extrabold shadow-sm'
+                    : 'border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
+                }`}
+              >
+                <span>🤝</span>
+                <span>{t.genderUnspecified || 'غير مهم'}</span>
+              </button>
+            </div>
+          </div>
+
           {/* 4. Persona Select & Proactivity */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -292,6 +378,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <option value="motivator">{t.personaMotivator}</option>
                 <option value="calm">{t.personaCalm}</option>
                 <option value="spontaneous">{t.personaSpontaneous}</option>
+                <option value="bold">{t.personaBold}</option>
               </select>
             </div>
 
@@ -310,6 +397,86 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </select>
             </div>
           </div>
+
+          {/* 4.5 Private Candid Conversations Mode Toggle */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-rose-500/10 border border-amber-500/30 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-600 shrink-0">
+                  <Flame className="w-5 h-5 text-amber-500 animate-pulse" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-extrabold text-[var(--text-main)] flex items-center gap-2">
+                    <span>{t.privateCandidTitle}</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 font-bold border border-amber-500/30">
+                      {localProfile.language === 'ar' ? 'نمط صريح وخاص' : 'Candid Mode'}
+                    </span>
+                  </h4>
+                  <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">
+                    {t.privateCandidDesc}
+                  </p>
+                </div>
+              </div>
+
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={localProfile.privateCandidMode || localProfile.personality === 'bold'}
+                  onChange={(e) =>
+                    setLocalProfile({ ...localProfile, privateCandidMode: e.target.checked })
+                  }
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-amber-500 peer-checked:to-orange-500"></div>
+              </label>
+            </div>
+          </div>
+
+          {/* 4.6 Marital Intimacy & Special Needs Counseling Card */}
+          {onOpenMaritalSupport && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-500/10 via-pink-500/10 to-amber-500/10 border border-rose-500/30 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-rose-500/20 text-rose-500 shrink-0">
+                    <HeartHandshake className="w-5 h-5 text-rose-500 animate-pulse" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-extrabold text-[var(--text-main)] flex items-center gap-2">
+                      <span>
+                        {localProfile.language === 'ar'
+                          ? 'جلسة الدعم والاستشارة الزوجية (18+)'
+                          : 'Marital Support Session (18+)'}
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-600 font-bold border border-rose-500/30">
+                        {localProfile.language === 'ar' ? '60 دقيقة يومياً' : '60 Mins'}
+                      </span>
+                    </h4>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">
+                      {localProfile.language === 'ar'
+                        ? 'مخصصة للتغلب على صعوبات العلاقة الزوجية الحميمة والتواصل مع الزوج/الزوجة عبر التعهد والسن القانوني (18+).'
+                        : 'Specialized counseling to overcome marital intimacy challenges with age verification (18+).'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={onOpenMaritalSupport}
+                  className="px-3 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 text-white text-xs font-bold shadow-md hover:opacity-90 shrink-0 transition-all"
+                >
+                  {localProfile.specialCounselingEnabled &&
+                  localProfile.specialCounselingExpiresAt &&
+                  new Date(localProfile.specialCounselingExpiresAt).getTime() > Date.now()
+                    ? localProfile.language === 'ar'
+                      ? 'مفعّلة الآن'
+                      : 'Active Now'
+                    : localProfile.language === 'ar'
+                    ? 'تفعيل الجلسة'
+                    : 'Activate'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* 5. Theme & Emojis */}
           <div className="p-4 rounded-2xl bg-[var(--bg-main)] border border-[var(--border-color)] space-y-3">

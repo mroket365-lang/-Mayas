@@ -4,14 +4,21 @@ import path from 'path';
 export interface UserEntity {
   id: string;
   email: string;
+  username?: string;
+  phone?: string;
+  passwordHash?: string;
   name: string;
-  role: 'super_admin' | 'admin' | 'support' | 'user';
+  role: 'super_admin' | 'admin' | 'assistant' | 'user';
   status: 'active' | 'suspended' | 'banned';
+  permissions?: string[];
   createdAt: string;
   lastActiveAt: string;
   timezone?: string;
   locale?: string;
   currency?: string;
+  profileData?: any;
+  messagesData?: any;
+  itemsData?: any;
 }
 
 export interface PlanEntity {
@@ -93,6 +100,13 @@ export interface AIUsageLogEntity {
   timestamp: string;
 }
 
+export interface FeatureFlagConfig {
+  mode: 'hidden' | 'everyone' | 'specific_user' | 'allowed_users_list' | 'region';
+  allowedUserId?: string;
+  allowedUsersList?: string;
+  allowedRegion?: string;
+}
+
 export interface SystemSettingsEntity {
   maintenanceMode: boolean;
   newRegistrationsEnabled: boolean;
@@ -105,6 +119,10 @@ export interface SystemSettingsEntity {
     gemini: { enabled: boolean; model: string };
     openai: { enabled: boolean; model: string };
   };
+  privateCandidVisibility?: FeatureFlagConfig;
+  maritalSupportVisibility?: FeatureFlagConfig;
+  superAdminEmail?: string;
+  superAdminPassword?: string;
 }
 
 export interface DatabaseSchema {
@@ -242,6 +260,10 @@ const defaultDatabase: DatabaseSchema = {
       gemini: { enabled: true, model: 'gemini-3.6-flash' },
       openai: { enabled: true, model: 'gpt-4o-mini' },
     },
+    privateCandidVisibility: { mode: 'hidden' },
+    maritalSupportVisibility: { mode: 'hidden' },
+    superAdminEmail: 'admin@rafiq.ai',
+    superAdminPassword: 'AdminSecret2026!',
   },
 };
 

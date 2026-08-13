@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { processCompanionChat, processCompanionChatStream, generateDailyReview } from './server/geminiService.js';
 import { adminRouter } from './server/routes/adminRoutes.js';
 import { userSubscriptionRouter } from './server/routes/userSubscriptionRoutes.js';
+import { authRouter } from './server/routes/authRoutes.js';
 
 dotenv.config();
 
@@ -18,6 +19,7 @@ async function startServer() {
   // API Routes FIRST
   app.use('/api/admin', adminRouter);
   app.use('/api', userSubscriptionRouter);
+  app.use('/api', authRouter);
 
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', app: 'Rafiq AI Companion', timestamp: new Date().toISOString() });
@@ -25,7 +27,7 @@ async function startServer() {
 
   app.post('/api/companion/chat-stream', async (req, res) => {
     try {
-      const { message, history, profile, items, mediaBase64, mediaMimeType } = req.body;
+      const { message, history, profile, items, mediaBase64, mediaMimeType, clientTimeContext } = req.body;
       if (!message && !mediaBase64) {
         return res.status(400).json({ error: 'Message or media parameter is required' });
       }
@@ -44,7 +46,8 @@ async function startServer() {
           res.write(`data: ${JSON.stringify({ text: chunkText })}\n\n`);
         },
         mediaBase64,
-        mediaMimeType
+        mediaMimeType,
+        clientTimeContext
       );
 
       res.write(`data: ${JSON.stringify({
@@ -69,7 +72,7 @@ async function startServer() {
 
   app.post('/api/companion/chat', async (req, res) => {
     try {
-      const { message, history, profile, items, mediaBase64, mediaMimeType } = req.body;
+      const { message, history, profile, items, mediaBase64, mediaMimeType, clientTimeContext } = req.body;
       if (!message && !mediaBase64) {
         return res.status(400).json({ error: 'Message or media parameter is required' });
       }
@@ -80,7 +83,8 @@ async function startServer() {
         profile || {},
         items || [],
         mediaBase64,
-        mediaMimeType
+        mediaMimeType,
+        clientTimeContext
       );
 
       return res.json(result);

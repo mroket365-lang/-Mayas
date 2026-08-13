@@ -14,10 +14,10 @@ export async function processOrchestratedChatStream(
   request: OrchestrationRequest,
   onChunk: (chunkText: string) => void
 ): Promise<OrchestrationResponse> {
-  const { message, history, profile, items, mediaBase64, mediaMimeType } = request;
+  const { message, history, profile, items, mediaBase64, mediaMimeType, clientTimeContext } = request;
   const isArabic = profile.language === 'ar';
-  const now = new Date();
-  const currentDateStr = now.toISOString().split('T')[0];
+  const refDate = clientTimeContext?.isoTimestamp ? new Date(clientTimeContext.isoTimestamp) : new Date();
+  const currentDateStr = refDate.toISOString().split('T')[0];
   const userId = profile.id || 'user_default_01';
 
   // --- SERVER-SIDE SUBSCRIPTION & USAGE ENFORCEMENT ---
@@ -41,7 +41,7 @@ export async function processOrchestratedChatStream(
   const intent = analyzeIntentAndComplexity(message, history);
 
   // 2. Memory & Context Filtering
-  const { systemInstruction } = filterAndFormatContext(profile, items, message);
+  const { systemInstruction } = filterAndFormatContext(profile, items, message, clientTimeContext);
 
   // 3. Prepare Prompt Contents
   const formattedContents: Array<{ role: string; parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> }> =
@@ -128,10 +128,10 @@ export async function processOrchestratedChatStream(
 export async function processOrchestratedChat(
   request: OrchestrationRequest
 ): Promise<OrchestrationResponse> {
-  const { message, history, profile, items, mediaBase64, mediaMimeType } = request;
+  const { message, history, profile, items, mediaBase64, mediaMimeType, clientTimeContext } = request;
   const isArabic = profile.language === 'ar';
-  const now = new Date();
-  const currentDateStr = now.toISOString().split('T')[0];
+  const refDate = clientTimeContext?.isoTimestamp ? new Date(clientTimeContext.isoTimestamp) : new Date();
+  const currentDateStr = refDate.toISOString().split('T')[0];
   const userId = profile.id || 'user_default_01';
 
   // --- SERVER-SIDE SUBSCRIPTION & USAGE ENFORCEMENT ---
@@ -154,7 +154,7 @@ export async function processOrchestratedChat(
   const intent = analyzeIntentAndComplexity(message, history);
 
   // 2. Memory & Context Filtering
-  const { systemInstruction } = filterAndFormatContext(profile, items, message);
+  const { systemInstruction } = filterAndFormatContext(profile, items, message, clientTimeContext);
 
   // 3. Prepare Prompt Contents
   const formattedContents: Array<{ role: string; parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> }> =
