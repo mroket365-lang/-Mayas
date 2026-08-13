@@ -64,6 +64,7 @@ export const AdminPlansView: React.FC<AdminPlansViewProps> = ({ token }) => {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
         },
         body: JSON.stringify(editingPlan),
       });
@@ -72,6 +73,16 @@ export const AdminPlansView: React.FC<AdminPlansViewProps> = ({ token }) => {
       if (!res.ok) throw new Error(data.error || 'Failed to save plan');
 
       setSaveMessage('تم حفظ الخطة بنجاح!');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('system_settings_updated'));
+        try {
+          const bc = new BroadcastChannel('rafiq_settings_sync');
+          bc.postMessage('updated');
+          bc.close();
+        } catch (e) {
+          // ignore
+        }
+      }
       setEditingPlan(null);
       setIsCreating(false);
       fetchPlans();

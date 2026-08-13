@@ -136,6 +136,7 @@ export interface SystemSettingsEntity {
   superAdminEmail?: string;
   superAdminPassword?: string;
   paymentMethods?: PaymentMethodEntity[];
+  updatedAt?: string;
 }
 
 export interface DatabaseSchema {
@@ -513,7 +514,11 @@ class Database {
   }
 
   public updateSettings(partial: Partial<SystemSettingsEntity>): SystemSettingsEntity {
-    this.data.settings = { ...this.data.settings, ...partial };
+    this.data.settings = {
+      ...this.data.settings,
+      ...partial,
+      updatedAt: new Date().toISOString(),
+    };
     this.save();
     return this.data.settings;
   }
@@ -532,6 +537,7 @@ class Database {
     } else {
       this.data.settings.paymentMethods.push(pm);
     }
+    (this.data.settings as any).updatedAt = new Date().toISOString();
     this.save();
     return pm;
   }
@@ -539,6 +545,7 @@ class Database {
   public deletePaymentMethod(id: string): void {
     if (!this.data.settings.paymentMethods) return;
     this.data.settings.paymentMethods = this.data.settings.paymentMethods.filter((p) => p.id !== id);
+    (this.data.settings as any).updatedAt = new Date().toISOString();
     this.save();
   }
 }

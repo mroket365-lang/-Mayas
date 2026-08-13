@@ -5,8 +5,8 @@ import { PaymentGatewayManager } from '../services/payment/PaymentProvider.js';
 
 export const userSubscriptionRouter = Router();
 
-// GET /api/user/subscription?userId=xxx
-userSubscriptionRouter.get('/subscription', (req: Request, res: Response) => {
+// GET /api/user/subscription or /api/subscription/status
+const handleGetSubscription = (req: Request, res: Response) => {
   const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || 'user_default_01';
   
   const { user, subscription, plan } = SubscriptionService.getUserSubscription(userId);
@@ -53,13 +53,21 @@ userSubscriptionRouter.get('/subscription', (req: Request, res: Response) => {
     period,
     usage: usageMap,
   });
-});
+};
 
-// GET /api/user/plans
-userSubscriptionRouter.get('/plans', (req: Request, res: Response) => {
+userSubscriptionRouter.get('/subscription', handleGetSubscription);
+userSubscriptionRouter.get('/subscription/status', handleGetSubscription);
+userSubscriptionRouter.get('/user/subscription', handleGetSubscription);
+
+// GET /api/user/plans or /api/subscription/plans or /api/plans
+const handleGetPlans = (req: Request, res: Response) => {
   const publicPlans = db.getPlans().filter((p) => p.active);
   return res.json(publicPlans);
-});
+};
+
+userSubscriptionRouter.get('/plans', handleGetPlans);
+userSubscriptionRouter.get('/user/plans', handleGetPlans);
+userSubscriptionRouter.get('/subscription/plans', handleGetPlans);
 
 // GET /api/payment-methods
 userSubscriptionRouter.get('/payment-methods', (req: Request, res: Response) => {

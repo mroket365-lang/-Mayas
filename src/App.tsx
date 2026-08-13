@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { ShieldAlert, AlertTriangle } from 'lucide-react';
 import { UserProfile, CompanionItem, ChatMessage } from './types';
 import { storageService } from './services/storageService';
 import { alarmEngine } from './services/alarmEngine';
@@ -17,6 +18,20 @@ import { MaritalCounselingModal } from './components/MaritalCounselingModal';
 import { AuthModal } from './components/AuthModal';
 import { AdminPanel } from './admin/AdminPanel';
 
+export interface SystemPublicSettings {
+  maintenanceMode: boolean;
+  newRegistrationsEnabled: boolean;
+  multiAIEnabled: boolean;
+  voiceEnabled: boolean;
+  privateCandidAllowed: boolean;
+  maritalSupportAllowed: boolean;
+  privateCandidMode: string;
+  maritalSupportMode: string;
+  updatedAt: string;
+  plans: any[];
+  paymentMethods: any[];
+}
+
 export default function App() {
   const [isAdminRoute, setIsAdminRoute] = useState<boolean>(() => {
     return window.location.pathname.startsWith('/admin');
@@ -27,6 +42,8 @@ export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>(() => storageService.getMessages());
   const [activeTab, setActiveTab] = useState<'companion' | 'saved' | 'today'>('companion');
 
+  const [systemSettings, setSystemSettings] = useState<SystemPublicSettings | null>(null);
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
   const [isSubscriptionOpen, setIsSubscriptionOpen] = useState(false);
@@ -36,6 +53,65 @@ export default function App() {
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [dailyReviewText, setDailyReviewText] = useState<string>('');
   const [isReviewing, setIsReviewing] = useState(false);
+
+  // Real-Time System Settings Synchronization (< 10 seconds guarantee)
+  const syncSystemSettings = useCallback(async () => {
+    try {
+      const query = new URLSearchParams({
+        _t: Date.now().toString(),
+        userId: profile.id || '',
+        email: profile.email || '',
+      });
+      const res = await fetch(`/api/public/settings?${query.toString()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSystemSettings(data);
+      }
+    } catch (e) {
+      console.warn('Sync settings error:', e);
+    }
+  }, [profile.id, profile.email]);
+
+  useEffect(() => {
+    syncSystemSettings();
+
+    // Fast 3-second polling loop to guarantee immediate < 10 second updates from Admin Control Panel
+    const interval = setInterval(syncSystemSettings, 3000);
+
+    const handleFocusOrVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        syncSystemSettings();
+      }
+    };
+
+    window.addEventListener('focus', handleFocusOrVisibility);
+    document.addEventListener('visibilitychange', handleFocusOrVisibility);
+    window.addEventListener('system_settings_updated', syncSystemSettings);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('rafiq_settings_sync');
+      bc.onmessage = () => {
+        syncSystemSettings();
+      };
+    } catch (e) {
+      // ignore
+    }
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocusOrVisibility);
+      document.removeEventListener('visibilitychange', handleFocusOrVisibility);
+      window.removeEventListener('system_settings_updated', syncSystemSettings);
+      if (bc) bc.close();
+    };
+  }, [syncSystemSettings]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -338,14 +414,35 @@ export default function App() {
   };
 
   return (
-    <div className="h-dvh flex flex-col bg-[var(--bg-main)] text-[var(--text-main)] transition-colors max-w-full overflow-hidden">
+    <div className="h-dvh flex flex-col bg-[var(--bg-main)] text-[var(--text-main)] transition-colors max-w-full overflow-hidden relative">
+      {/* Real-time System Maintenance Overlay */}
+      {systemSettings?.maintenanceMode && (
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md text-white flex flex-col items-center justify-center p-6 text-center animate-fade-in">
+          <div className="p-4 rounded-3xl bg-amber-500/20 border border-amber-500/40 text-amber-400 mb-4 animate-bounce">
+            <AlertTriangle className="w-12 h-12" />
+          </div>
+          <h2 className="text-2xl font-black mb-2">النظام في حالة صيانة مؤقتة</h2>
+          <p className="text-slate-300 max-w-md text-sm mb-6">
+            يقوم فريق الإدارة بتحديث الخدمات في لوحة التحكم حالياً. ستعمل المنصة وتتزامن تلقائياً فور انتهاء التعديلات خلال لحظات.
+          </p>
+          <div className="px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-slate-400 font-mono flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+            <span>جاري المزامنة التلقائية مع لوحة التحكم (&lt; 10 ثوانٍ)...</span>
+          </div>
+        </div>
+      )}
+
       <Header
         profile={profile}
         onUpdateProfile={handleUpdateProfile}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenPermissions={() => setIsPermissionsOpen(true)}
         onOpenSubscription={() => setIsSubscriptionOpen(true)}
-        onOpenMaritalSupport={() => setIsMaritalSupportOpen(true)}
+        onOpenMaritalSupport={
+          systemSettings?.maritalSupportAllowed !== false
+            ? () => setIsMaritalSupportOpen(true)
+            : undefined
+        }
       />
 
       <main className="flex-1 max-w-4xl w-full mx-auto p-2 overflow-hidden flex flex-col min-h-0">

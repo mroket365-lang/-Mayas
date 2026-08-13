@@ -9,8 +9,8 @@ function generateAccountId(): string {
   return `USR-${randNum}`;
 }
 
-// POST /api/auth/register
-authRouter.post('/register', (req: Request, res: Response) => {
+// POST /api/register or /api/auth/register
+const handleRegister = (req: Request, res: Response) => {
   const { email, password, name, username, phone, profileData, messagesData, itemsData } = req.body;
 
   if (!email || !password || !name) {
@@ -84,7 +84,10 @@ authRouter.post('/register', (req: Request, res: Response) => {
     },
     token: `token_${newUser.id}_${Date.now()}`,
   });
-});
+};
+
+authRouter.post('/register', handleRegister);
+authRouter.post('/auth/register', handleRegister);
 
 // POST /api/auth/login
 authRouter.post('/login', (req: Request, res: Response) => {

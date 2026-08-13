@@ -78,6 +78,19 @@ export const AdminPaymentMethodsView: React.FC<AdminPaymentMethodsViewProps> = (
     setIsModalOpen(true);
   };
 
+  const notifySettingsUpdated = () => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('system_settings_updated'));
+      try {
+        const bc = new BroadcastChannel('rafiq_settings_sync');
+        bc.postMessage('updated');
+        bc.close();
+      } catch (e) {
+        // ignore
+      }
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTitle.trim() || !formDetails.trim()) {
@@ -108,6 +121,7 @@ export const AdminPaymentMethodsView: React.FC<AdminPaymentMethodsViewProps> = (
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
         },
         body: JSON.stringify(payload),
       });
@@ -117,6 +131,7 @@ export const AdminPaymentMethodsView: React.FC<AdminPaymentMethodsViewProps> = (
 
       setMsg(editingItem ? 'تم تحديث طريقة الدفع بنجاح' : 'تمت إضافة طريقة الدفع الجديدة بنجاح');
       setIsModalOpen(false);
+      notifySettingsUpdated();
       fetchPaymentMethods();
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : 'فشل الحفظ';
@@ -133,10 +148,12 @@ export const AdminPaymentMethodsView: React.FC<AdminPaymentMethodsViewProps> = (
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
         },
         body: JSON.stringify({ enabled: !item.enabled }),
       });
       if (res.ok) {
+        notifySettingsUpdated();
         fetchPaymentMethods();
       }
     } catch (err) {
@@ -149,10 +166,14 @@ export const AdminPaymentMethodsView: React.FC<AdminPaymentMethodsViewProps> = (
     try {
       const res = await fetch(`/api/admin/payment-methods/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        },
       });
       if (res.ok) {
         setMsg('تم حذف طريقة الدفع بنجاح');
+        notifySettingsUpdated();
         fetchPaymentMethods();
       }
     } catch (err) {

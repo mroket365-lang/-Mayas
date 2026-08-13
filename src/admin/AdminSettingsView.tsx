@@ -31,8 +31,13 @@ export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({ token }) =
   const fetchSettings = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/settings', {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(`/api/admin/settings?_t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
       });
       if (res.ok) {
         const json = await res.json();
@@ -49,6 +54,19 @@ export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({ token }) =
     fetchSettings();
   }, []);
 
+  const notifySettingsUpdated = () => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('system_settings_updated'));
+      try {
+        const bc = new BroadcastChannel('rafiq_settings_sync');
+        bc.postMessage('updated');
+        bc.close();
+      } catch (e) {
+        // ignore
+      }
+    }
+  };
+
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!settings) return;
@@ -61,12 +79,14 @@ export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({ token }) =
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
         },
         body: JSON.stringify(settings),
       });
 
       if (!res.ok) throw new Error('Failed to save settings');
-      setMsg('تم حفظ إعدادات النظام وتغييرات الميزات بنجاح!');
+      setMsg('تم حفظ إعدادات النظام وتغييرات الميزات بنجاح وانعكاسها فوراً لدى المستخدمين!');
+      notifySettingsUpdated();
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : 'Save failed';
       setMsg(`خطأ: ${errorMsg}`);

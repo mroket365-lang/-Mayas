@@ -26,10 +26,17 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
     const fetchData = async () => {
       setLoading(true);
       try {
+        const fetchOpts = {
+          cache: 'no-store' as RequestCache,
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            Pragma: 'no-cache',
+          },
+        };
         const [statusRes, plansRes, methodsRes] = await Promise.all([
-          fetch(`/api/subscription/status?userId=${userId}`),
-          fetch('/api/subscription/plans'),
-          fetch('/api/payment-methods'),
+          fetch(`/api/subscription/status?userId=${userId}&_t=${Date.now()}`, fetchOpts),
+          fetch(`/api/subscription/plans?_t=${Date.now()}`, fetchOpts),
+          fetch(`/api/payment-methods?_t=${Date.now()}`, fetchOpts),
         ]);
 
         if (statusRes.ok) {
