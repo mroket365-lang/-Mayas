@@ -265,6 +265,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const t = getTranslation(profile.language);
 
@@ -317,15 +318,17 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
   const prevMsgLengthRef = useRef(messages.length);
 
   useEffect(() => {
-    if (!messagesEndRef.current) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
     const isNewMessage = messages.length !== prevMsgLengthRef.current;
     prevMsgLengthRef.current = messages.length;
 
-    // Smooth scroll for new messages, instant scroll for streaming updates
+    // Use container internal scroll to avoid window viewport scrolling on mobile
     const timer = setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({
+      container.scrollTo({
+        top: container.scrollHeight,
         behavior: isNewMessage ? 'smooth' : 'auto',
-        block: 'end',
       });
     }, 50);
 
@@ -551,7 +554,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-125px)] max-w-2xl mx-auto relative">
+    <div className="flex flex-col h-[calc(100dvh-125px)] max-w-2xl mx-auto relative">
       {(profile.privateCandidMode || profile.personality === 'bold') && (
         <div className="mx-3 mt-2 px-3.5 py-2 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-rose-500/15 border border-amber-500/30 text-[11px] font-bold text-amber-600 dark:text-amber-400 flex items-center justify-between gap-2 shadow-sm animate-fade-in shrink-0">
           <div className="flex items-center gap-2">
@@ -587,7 +590,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
         )}
 
       {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 pb-12 sm:pb-16">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 pb-12 sm:pb-16">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-4 animate-fade-in">
             <div className="p-4 rounded-3xl bg-[var(--accent-sage)]/10 text-[var(--accent-sage)]">

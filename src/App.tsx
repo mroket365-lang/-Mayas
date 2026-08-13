@@ -338,7 +338,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--bg-main)] text-[var(--text-main)] transition-colors">
+    <div className="min-h-screen flex flex-col bg-[var(--bg-main)] text-[var(--text-main)] transition-colors max-w-full overflow-x-hidden">
       <Header
         profile={profile}
         onUpdateProfile={handleUpdateProfile}

@@ -95,8 +95,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-2xl overflow-hidden rounded-3xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl p-6 md:p-8 space-y-7 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-x-hidden">
+      <div className="w-full max-w-2xl max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-3xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl p-4 sm:p-6 md:p-8 space-y-5 sm:space-y-7 max-h-[90vh] overflow-y-auto my-auto">
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b pb-4 border-[var(--border-color)]">
           <div className="flex items-center gap-3">
@@ -319,44 +319,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <label className="text-xs font-bold text-[var(--text-muted)] uppercase">
               {t.chooseCompanionGender || 'جنس الرفيق (ذَكَر / مُؤنَّث / غير مهم)'}
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
               <button
                 type="button"
                 onClick={() => setLocalProfile({ ...localProfile, companionGender: 'male' })}
-                className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                className={`py-2 px-1.5 sm:px-3 rounded-xl border text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1 sm:gap-1.5 transition-all truncate ${
                   localProfile.companionGender === 'male' || !localProfile.companionGender
                     ? 'border-[var(--accent-sage)] bg-[var(--accent-sage)]/15 text-[var(--accent-sage)] font-extrabold shadow-sm'
                     : 'border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
                 }`}
               >
                 <span>👨‍💼</span>
-                <span>{t.genderMale || 'مذكر'}</span>
+                <span className="truncate">{t.genderMale || 'مذكر'}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setLocalProfile({ ...localProfile, companionGender: 'female' })}
-                className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                className={`py-2 px-1.5 sm:px-3 rounded-xl border text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1 sm:gap-1.5 transition-all truncate ${
                   localProfile.companionGender === 'female'
                     ? 'border-[var(--accent-sage)] bg-[var(--accent-sage)]/15 text-[var(--accent-sage)] font-extrabold shadow-sm'
                     : 'border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
                 }`}
               >
                 <span>👩‍💼</span>
-                <span>{t.genderFemale || 'مؤنث'}</span>
+                <span className="truncate">{t.genderFemale || 'مؤنث'}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setLocalProfile({ ...localProfile, companionGender: 'unspecified' })}
-                className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                className={`py-2 px-1.5 sm:px-3 rounded-xl border text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1 sm:gap-1.5 transition-all truncate ${
                   localProfile.companionGender === 'unspecified'
                     ? 'border-[var(--accent-sage)] bg-[var(--accent-sage)]/15 text-[var(--accent-sage)] font-extrabold shadow-sm'
                     : 'border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
                 }`}
               >
                 <span>🤝</span>
-                <span>{t.genderUnspecified || 'غير مهم'}</span>
+                <span className="truncate">{t.genderUnspecified || 'غير مهم'}</span>
               </button>
             </div>
           </div>
