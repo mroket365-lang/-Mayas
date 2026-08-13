@@ -406,6 +406,14 @@ export default function App() {
         <SubscriptionModal
           profile={profile}
           onClose={() => setIsSubscriptionOpen(false)}
+          onProfileUpdated={(updatedProfile) => {
+            setProfile(updatedProfile);
+            try {
+              localStorage.setItem('ai_companion_profile', JSON.stringify(updatedProfile));
+            } catch (e) {
+              console.error('Save profile error', e);
+            }
+          }}
         />
       )}
 
@@ -419,6 +427,10 @@ export default function App() {
           onOpenMaritalSupport={() => {
             setIsSettingsOpen(false);
             setIsMaritalSupportOpen(true);
+          }}
+          onOpenSubscription={() => {
+            setIsSettingsOpen(false);
+            setIsSubscriptionOpen(true);
           }}
           onOpenAuth={() => {
             setIsSettingsOpen(false);

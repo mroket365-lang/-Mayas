@@ -21,6 +21,7 @@ import {
   HeartHandshake,
   UserCheck,
   LogIn,
+  Crown,
 } from 'lucide-react';
 
 interface SettingsModalProps {
@@ -30,6 +31,7 @@ interface SettingsModalProps {
   onClearMemory: () => void;
   onExportData: () => void;
   onOpenMaritalSupport?: () => void;
+  onOpenSubscription?: () => void;
   onOpenAuth?: () => void;
 }
 
@@ -40,6 +42,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClearMemory,
   onExportData,
   onOpenMaritalSupport,
+  onOpenSubscription,
   onOpenAuth,
 }) => {
   const [localProfile, setLocalProfile] = useState<UserProfile>({ ...profile });
@@ -260,6 +263,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Subscription & Plans Section */}
+          {onOpenSubscription && (
+            <div className="p-4 rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-amber-500/20 text-amber-500">
+                    <Crown className="w-5 h-5 animate-pulse" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-[var(--text-main)]">
+                      {localProfile.language === 'ar' ? 'باقة الاشتراك والترقية' : 'Subscription & Pro Plans'}
+                    </h4>
+                    <p className="text-[10px] text-[var(--text-muted)]">
+                      {localProfile.language === 'ar' ? 'احصل على محادثات غير محدودة، سرعة فائقة ودعم لجميع نماذج AI' : 'Get unlimited AI messages and premium features'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={onOpenSubscription}
+                  className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-extrabold transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20 shrink-0"
+                >
+                  <Crown className="w-3.5 h-3.5 text-amber-100" />
+                  <span>{localProfile.language === 'ar' ? 'إدارة الاشتراك والترقية ✨' : 'Manage Subscription ✨'}</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Account & Synchronization Section */}
           <div className="p-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-hover)] space-y-3">

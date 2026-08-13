@@ -24,6 +24,9 @@ import {
   Scissors,
   Flame,
   HeartHandshake,
+  Plus,
+  FileText,
+  AlertCircle,
 } from 'lucide-react';
 import { speechService } from '../services/speechService';
 import { AudioWaveform } from './AudioWaveform';
@@ -223,11 +226,47 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
   const [activeAudioStream, setActiveAudioStream] = useState<MediaStream | null>(null);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
 
-  // MediaRecorder refs
+  // Live Continuous Voice Conversation & Plus Menu States
+  const [isContinuousVoiceMode, setIsContinuousVoiceMode] = useState(true);
+  const [liveVoiceStatus, setLiveVoiceStatus] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
+  const [aiSpokenText, setAiSpokenText] = useState<string>('');
+  const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
+  const [micPermissionError, setMicPermissionError] = useState(false);
+
+  // MediaRecorder & Navigation refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<any>(null);
   const accumulatedTranscriptRef = useRef<string>('');
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const plusMenuRef = useRef<HTMLDivElement | null>(null);
+  const messagesRef = useRef<ChatMessage[]>(messages);
+
+  // Keep messagesRef in sync with current messages prop
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  // Click outside to close plus menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (plusMenuRef.current && !plusMenuRef.current.contains(e.target as Node)) {
+        setIsPlusMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Auto-resize input textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      const scrollH = textareaRef.current.scrollHeight;
+      const newHeight = Math.min(Math.max(scrollH, 44), 160);
+      textareaRef.current.style.height = `${newHeight}px`;
+    }
+  }, [inputText]);
 
   // Attached media state
   const [attachedMedia, setAttachedMedia] = useState<{
@@ -324,7 +363,6 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
     const isNewMessage = messages.length !== prevMsgLengthRef.current;
     prevMsgLengthRef.current = messages.length;
 
-    // Use container internal scroll to avoid window viewport scrolling on mobile
     const timer = setTimeout(() => {
       container.scrollTo({
         top: container.scrollHeight,
@@ -355,12 +393,13 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
     const isVideo = file.type.startsWith('video/');
     const isImage = file.type.startsWith('image/');
     const isAudio = file.type.startsWith('audio/');
+    const isDoc = file.type.includes('pdf') || file.type.includes('text') || file.type.includes('document') || file.name.endsWith('.txt') || file.name.endsWith('.pdf');
 
-    if (!isImage && !isVideo && !isAudio) {
+    if (!isImage && !isVideo && !isAudio && !isDoc) {
       alert(
         profile.language === 'ar'
-          ? 'يرجى اختيار صورة، فيديو، أو ملف صوتي فقط'
-          : 'Please select an image, video, or audio file'
+          ? 'يرجى اختيار صورة، فيديو، ملف صوتي، أو مستند نصي/PDF'
+          : 'Please select an image, video, audio file, or document'
       );
       return;
     }
@@ -370,7 +409,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
       const result = reader.result as string;
       setAttachedMedia({
         base64: result,
-        mimeType: file.type,
+        mimeType: file.type || 'application/octet-stream',
         name: file.name,
         type: isVideo ? 'video' : isAudio ? 'audio' : 'image',
       });
@@ -382,6 +421,8 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
   const startVoiceInteraction = async () => {
     setIsVoiceOverlayOpen(true);
     setIsListening(true);
+    setMicPermissionError(false);
+    setLiveVoiceStatus('listening');
     setVoiceInterimText('');
     accumulatedTranscriptRef.current = '';
     setRecordingSeconds(0);
@@ -392,7 +433,6 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         setActiveAudioStream(stream);
 
-        // Setup MediaRecorder to capture physical audio recording
         try {
           const options = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
             ? { mimeType: 'audio/webm;codecs=opus' }
@@ -409,23 +449,27 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
             }
           };
 
-          recorder.start(200); // Collect slice every 200ms
+          recorder.start(200);
           mediaRecorderRef.current = recorder;
         } catch (e) {
           console.warn('MediaRecorder setup error:', e);
         }
+      } else {
+        throw new Error('getUserMedia not supported');
       }
     } catch (err) {
-      console.warn('Could not acquire raw stream for visualizer/recorder:', err);
+      console.warn('Could not acquire raw stream / permission denied:', err);
+      setMicPermissionError(true);
+      setIsListening(false);
+      setLiveVoiceStatus('idle');
+      return;
     }
 
-    // Start timer counter
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     recordingTimerRef.current = setInterval(() => {
       setRecordingSeconds((prev) => prev + 1);
     }, 1000);
 
-    // Start speech recognition in parallel for live text feedback
     speechService.startListening(
       profile.language,
       (transcript) => {
@@ -438,7 +482,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
         console.warn('Speech recognition warning:', err);
       },
       () => {
-        // Recognition completed or paused
+        // Recognition complete
       }
     );
   };
@@ -459,6 +503,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
 
     setIsListening(false);
     setIsVoiceOverlayOpen(false);
+    setLiveVoiceStatus('idle');
   };
 
   const handleCancelVoice = () => {
@@ -481,7 +526,6 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
     }
 
     speechService.stopListening();
-    speechService.stopSpeaking();
 
     // Stop MediaRecorder and assemble recorded Audio Blob
     let audioBlob: Blob | null = null;
@@ -508,9 +552,8 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
     }
 
     setIsListening(false);
-    setIsVoiceOverlayOpen(false);
+    setLiveVoiceStatus('thinking');
 
-    // Prepare audio media base64
     let audioMedia:
       | { base64: string; mimeType: string; name: string; type: 'audio' }
       | undefined = undefined;
@@ -539,12 +582,33 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
     setVoiceInterimText('');
     accumulatedTranscriptRef.current = '';
 
+    // Send message to AI
     await onSendMessage(textToSend, audioMedia || attachedMedia || undefined);
     setAttachedMedia(null);
-  };
 
-  const replayVoice = (text: string) => {
-    speechService.speakText(text, profile.language, profile.voiceSpeed);
+    // Speak AI Response Aloud using updated messagesRef
+    const latestMsgs = messagesRef.current;
+    const latestAiMessage = [...latestMsgs].reverse().find((m) => m.sender === 'ai');
+    const replyToSpeak = latestAiMessage?.text || '';
+
+    if (replyToSpeak) {
+      setAiSpokenText(replyToSpeak);
+      setLiveVoiceStatus('speaking');
+      speechService.speakText(replyToSpeak, profile.language, profile.voiceSpeed || 1.0, () => {
+        if (isContinuousVoiceMode) {
+          // Restart hands-free continuous voice listening loop
+          startVoiceInteraction();
+        } else {
+          setLiveVoiceStatus('idle');
+          setIsVoiceOverlayOpen(false);
+        }
+      });
+    } else if (isContinuousVoiceMode) {
+      startVoiceInteraction();
+    } else {
+      setIsVoiceOverlayOpen(false);
+      setLiveVoiceStatus('idle');
+    }
   };
 
   const formatSeconds = (sec: number) => {
@@ -672,7 +736,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
         className="hidden"
       />
 
-      {/* Bottom Text, Media, & Voice Bar positioned cleanly above BottomNav */}
+      {/* Bottom Text, Media, & Voice Bar */}
       <div className="shrink-0 z-30 bg-[var(--bg-surface)] border-t border-[var(--border-color)] p-2.5 sm:p-3 shadow-lg rounded-t-2xl sm:rounded-t-3xl">
         <div className="max-w-2xl mx-auto space-y-2">
           {/* Attachment Thumbnail Preview */}
@@ -709,39 +773,99 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
             </div>
           )}
 
-          <form onSubmit={handleSend} className="flex items-center gap-1.5 sm:gap-2">
-            {/* Media File Attachment Button */}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="p-2.5 sm:p-3 rounded-2xl bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-sage)] transition-all shrink-0"
-              title={t.attachMedia}
-            >
-              <Paperclip className="w-5 h-5" />
-            </button>
+          <form onSubmit={handleSend} className="flex items-end gap-1.5 sm:gap-2 relative">
+            {/* When typing (inputText.trim().length > 0), hide paperclip and mic buttons, show single + button */}
+            {inputText.trim().length > 0 ? (
+              <div className="relative shrink-0 mb-0.5" ref={plusMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
+                  className={`p-2.5 sm:p-3 rounded-2xl border transition-all shrink-0 ${
+                    isPlusMenuOpen
+                      ? 'bg-[var(--accent-sage)] text-white border-[var(--accent-sage)]'
+                      : 'bg-[var(--bg-hover)] text-[var(--accent-sage)] border-[var(--border-color)] hover:bg-[var(--accent-sage)]/10'
+                  }`}
+                  title={profile.language === 'ar' ? 'إضافة خيارات' : 'Add options'}
+                >
+                  <Plus className={`w-5 h-5 transition-transform duration-200 ${isPlusMenuOpen ? 'rotate-45' : ''}`} />
+                </button>
 
-            {/* Mic Voice Button */}
-            <button
-              type="button"
-              onClick={startVoiceInteraction}
-              className="p-2.5 sm:p-3 rounded-2xl bg-[var(--bg-hover)] text-[var(--accent-sage)] hover:bg-[var(--accent-sage)]/10 transition-all shadow-sm shrink-0"
-              title={t.voiceMode}
-            >
-              <Mic className="w-5 h-5" />
-            </button>
+                {/* Popover options menu */}
+                {isPlusMenuOpen && (
+                  <div className="absolute bottom-full mb-2 start-0 z-50 w-56 p-2 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl space-y-1 animate-scale-up">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPlusMenuOpen(false);
+                        fileInputRef.current?.click();
+                      }}
+                      className="w-full px-3 py-2.5 rounded-xl hover:bg-[var(--bg-hover)] text-xs font-bold text-[var(--text-main)] flex items-center gap-2.5 transition-all text-start"
+                    >
+                      <Paperclip className="w-4 h-4 text-[var(--accent-sage)] shrink-0" />
+                      <span>{profile.language === 'ar' ? 'رفع صورة أو مستند' : 'Attach Photo or Document'}</span>
+                    </button>
 
-            <input
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder={t.typeMessage}
-              className="flex-1 min-w-0 px-3.5 py-2.5 sm:py-3 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-sage)]"
-            />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPlusMenuOpen(false);
+                        startVoiceInteraction();
+                      }}
+                      className="w-full px-3 py-2.5 rounded-xl hover:bg-[var(--bg-hover)] text-xs font-bold text-[var(--text-main)] flex items-center gap-2.5 transition-all text-start"
+                    >
+                      <Mic className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>{profile.language === 'ar' ? 'المحادثة الصوتية المباشرة' : 'Live Voice Conversation'}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* When NOT typing (inputText is empty), show default Paperclip & Mic buttons */
+              <>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-2.5 sm:p-3 rounded-2xl bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-sage)] transition-all shrink-0 mb-0.5"
+                  title={t.attachMedia}
+                >
+                  <Paperclip className="w-5 h-5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={startVoiceInteraction}
+                  className="p-2.5 sm:p-3 rounded-2xl bg-[var(--bg-hover)] text-[var(--accent-sage)] hover:bg-[var(--accent-sage)]/10 transition-all shadow-sm shrink-0 mb-0.5"
+                  title={t.voiceMode}
+                >
+                  <Mic className="w-5 h-5" />
+                </button>
+              </>
+            )}
+
+            {/* Clear, Multi-line Auto-Expanding Textarea with Defined Borders & Return Line-Break Behavior */}
+            <div className="relative flex-1 min-w-0">
+              <textarea
+                ref={textareaRef}
+                rows={1}
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    // Do NOT submit form on Enter!
+                    // Allow Enter key / Return arrow on soft keyboards to insert a new line \n naturally
+                    e.stopPropagation();
+                  }
+                }}
+                placeholder={t.typeMessage}
+                className="w-full px-3.5 py-2.5 sm:py-3 rounded-2xl border-2 border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] text-xs sm:text-sm font-medium leading-relaxed focus:outline-none focus:border-[var(--accent-sage)] focus:ring-2 focus:ring-[var(--accent-sage)]/20 shadow-inner resize-none transition-all"
+                style={{ minHeight: '44px', maxHeight: '160px' }}
+              />
+            </div>
 
             <button
               type="submit"
               disabled={(!inputText.trim() && !attachedMedia) || isLoading}
-              className="p-2.5 sm:p-3 rounded-2xl bg-[var(--accent-sage)] text-white disabled:opacity-40 hover:opacity-90 transition-all shadow-md shrink-0"
+              className="p-2.5 sm:p-3 rounded-2xl bg-[var(--accent-sage)] text-white disabled:opacity-40 hover:opacity-90 transition-all shadow-md shrink-0 mb-0.5"
             >
               <Send className="w-5 h-5" />
             </button>
@@ -749,13 +873,15 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
         </div>
       </div>
 
-      {/* Voice Mode Fullscreen Overlay with Waveform Visualizer & Direct Voice Send */}
+      {/* Real-time Live Audio Voice Mode Fullscreen Overlay */}
       {isVoiceOverlayOpen && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-between p-6 bg-slate-950/95 text-white backdrop-blur-md animate-fade-in pointer-events-auto">
           <div className="w-full flex justify-between items-center max-w-md">
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-emerald-400 animate-pulse" />
-              <span className="font-bold text-sm tracking-wide">{t.voiceMode}</span>
+              <span className="font-bold text-sm tracking-wide">
+                {profile.language === 'ar' ? 'الحديث المباشر (صوت وصوت)' : 'Live Voice Conversation'}
+              </span>
             </div>
 
             {/* Timer Counter */}
@@ -772,28 +898,82 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
             </button>
           </div>
 
-          <div className="w-full max-w-md flex flex-col items-center text-center space-y-6 my-auto">
-            {/* Audio Waveform Real-time Visualizer */}
-            <div className="w-full">
-              <AudioWaveform isListening={isListening} stream={activeAudioStream} />
+          {micPermissionError ? (
+            /* Microphone Permission Denied / Error Banner */
+            <div className="p-6 rounded-3xl bg-rose-500/10 border border-rose-500/30 max-w-sm text-center space-y-4 my-auto animate-fade-in">
+              <div className="w-14 h-14 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/30 shadow-inner">
+                <MicOff className="w-7 h-7 animate-bounce" />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-base font-bold text-rose-300">
+                  {profile.language === 'ar' ? 'مطلوب الإذن بالوصول للميكروفون' : 'Microphone Permission Required'}
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  {profile.language === 'ar'
+                    ? 'تعذر الوصول إلى الميكروفون. يرجى التوجه لإعدادات المتصفح وإعطاء الإذن لاستخدام المايك حتى يستمع إليك رفيقك ويجيبك.'
+                    : 'Microphone access could not be acquired. Please allow microphone permissions in browser settings.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={startVoiceInteraction}
+                className="w-full py-3.5 rounded-2xl bg-rose-500 hover:bg-rose-600 active:scale-[0.98] text-white font-bold text-xs shadow-lg transition-all"
+              >
+                {profile.language === 'ar' ? 'إعادة المحاولة والموافقة على الإذن 🎙️' : 'Retry & Grant Permission 🎙️'}
+              </button>
             </div>
+          ) : (
+            <div className="w-full max-w-md flex flex-col items-center text-center space-y-6 my-auto">
+              {/* Audio Waveform Real-time Visualizer */}
+              <div className="w-full">
+                <AudioWaveform isListening={liveVoiceStatus === 'listening' || isListening} stream={activeAudioStream} />
+              </div>
 
-            <p className="text-lg font-bold text-emerald-300">
-              {isListening ? t.listening : t.thinking}
-            </p>
+              {/* Live Status Indicator */}
+              <div className="space-y-1">
+                <p className="text-xl font-black text-emerald-300">
+                  {liveVoiceStatus === 'speaking'
+                    ? (profile.language === 'ar' ? '🔊 الرفيق يتحدث الآن...' : '🔊 Companion is speaking...')
+                    : liveVoiceStatus === 'thinking'
+                    ? (profile.language === 'ar' ? '🧠 الرفيق يفكر ويجهز الإجابة...' : '🧠 Companion is thinking...')
+                    : (profile.language === 'ar' ? '🎙️ يستمع لصوتك الآن...' : '🎙️ Listening to your voice...')}
+                </p>
+                <p className="text-xs text-slate-400">
+                  {profile.language === 'ar'
+                    ? 'تحدث بحرية، وسيقوم الرفيق بالرد عليك صوتياً مباشرة'
+                    : 'Speak freely, your companion responds aloud directly'}
+                </p>
+              </div>
 
-            {voiceInterimText ? (
-              <p className="text-base text-slate-200 max-w-md bg-white/10 p-4 rounded-2xl border border-white/10 italic">
-                "{voiceInterimText}"
-              </p>
-            ) : (
-              <p className="text-xs text-slate-400">
-                {profile.language === 'ar'
-                  ? 'تحدث الآن، جاري تسجيل صوتك ورسم الموجة الصوتية...'
-                  : 'Speak now, recording audio and generating real-time waveform...'}
-              </p>
-            )}
-          </div>
+              {/* Continuous Voice Loop Toggle */}
+              <button
+                type="button"
+                onClick={() => setIsContinuousVoiceMode(!isContinuousVoiceMode)}
+                className={`px-4 py-2 rounded-2xl border text-xs font-bold flex items-center gap-2 transition-all ${
+                  isContinuousVoiceMode
+                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                    : 'bg-white/10 border-white/20 text-slate-400'
+                }`}
+              >
+                <Radio className="w-4 h-4 animate-pulse" />
+                <span>
+                  {isContinuousVoiceMode
+                    ? (profile.language === 'ar' ? 'حوار مستمر تلقائياً (تفاعل صوتي دون انقطاع)' : 'Auto Continuous Dialogue ON')
+                    : (profile.language === 'ar' ? 'تفعيل الحوار المستمر' : 'Enable Continuous Dialogue')}
+                </span>
+              </button>
+
+              {voiceInterimText ? (
+                <p className="text-base text-slate-200 max-w-md bg-white/10 p-4 rounded-2xl border border-white/10 italic">
+                  "{voiceInterimText}"
+                </p>
+              ) : aiSpokenText && liveVoiceStatus === 'speaking' ? (
+                <p className="text-sm text-emerald-200 max-w-md bg-emerald-500/10 p-4 rounded-2xl border border-emerald-500/20 leading-relaxed">
+                  "{aiSpokenText}"
+                </p>
+              ) : null}
+            </div>
+          )}
 
           {/* Action Buttons: Prominent Send Voice button and Cancel button */}
           <div className="w-full max-w-md flex flex-col gap-3">
@@ -803,7 +983,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
               className="w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] text-white font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/25 transition-all"
             >
               <SendHorizontal className="w-5 h-5" />
-              <span>{t.sendVoice}</span>
+              <span>{profile.language === 'ar' ? 'إرسال وتحاور صوتياً 🚀' : 'Send & Talk Aloud 🚀'}</span>
             </button>
 
             <button
@@ -812,7 +992,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
               className="w-full py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm flex items-center justify-center gap-2 transition-all border border-slate-700"
             >
               <X className="w-4 h-4" />
-              <span>{profile.language === 'ar' ? 'إلغاء' : 'Cancel'}</span>
+              <span>{profile.language === 'ar' ? 'إغلاق المحادثة الصوتية' : 'Close Voice Chat'}</span>
             </button>
           </div>
         </div>

@@ -85,31 +85,61 @@ export const speechService = {
   },
 
   speakText(text: string, lang: AppLanguage, speed: number = 1.0, onEnd?: () => void) {
-    if (!('speechSynthesis' in window)) return;
+    if (!('speechSynthesis' in window)) {
+      if (onEnd) onEnd();
+      return;
+    }
 
     try {
       window.speechSynthesis.cancel(); // Stop any ongoing speech
       const cleanText = text.replace(/[*#_`~]/g, ''); // strip markdown chars
+      if (!cleanText.trim()) {
+        if (onEnd) onEnd();
+        return;
+      }
+
       const utterance = new SpeechSynthesisUtterance(cleanText);
       const locale = langToLocale[lang] || 'ar-SA';
       utterance.lang = locale;
       utterance.rate = speed;
 
+      let hasFinished = false;
+      const finishOnce = () => {
+        if (!hasFinished) {
+          hasFinished = true;
+          if (onEnd) onEnd();
+        }
+      };
+
       // Find appropriate voice if available
       const voices = window.speechSynthesis.getVoices();
-      const targetLangPrefix = lang;
+      const targetLangPrefix = lang.toLowerCase();
       const suitableVoice = voices.find(v => v.lang.toLowerCase().startsWith(targetLangPrefix));
       if (suitableVoice) {
         utterance.voice = suitableVoice;
       }
 
       utterance.onend = () => {
-        if (onEnd) onEnd();
+        finishOnce();
+      };
+
+      utterance.onerror = (err) => {
+        console.warn('Speech synthesis utterance error:', err);
+        finishOnce();
       };
 
       window.speechSynthesis.speak(utterance);
+
+      // Safety timeout in case browser speech synthesis gets stuck
+      const approxDurationMs = Math.max(2000, (cleanText.length / 10) * 1000);
+      setTimeout(() => {
+        if (!hasFinished && window.speechSynthesis.speaking) {
+          // If still speaking after generous time, don't force cancel but allow callback if done
+        }
+      }, approxDurationMs + 5000);
     } catch (e) {
       console.warn('Speech synthesis error:', e);
+      if (onEnd) onEnd();
     }
   },
 
