@@ -10,6 +10,7 @@ const STORAGE_KEYS = {
 export const defaultProfile: UserProfile = {
   displayName: 'غالي',
   addressAs: 'يا غالي',
+  companionGender: 'female',
   personality: 'close_friend',
   language: 'ar',
   proactivityLevel: 'medium',

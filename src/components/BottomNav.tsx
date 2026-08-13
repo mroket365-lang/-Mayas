@@ -13,7 +13,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, pr
   const t = getTranslation(profile.language);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 h-[60px] border-t backdrop-blur-lg bg-[var(--bg-surface)]/95 border-[var(--border-color)] px-4 flex items-center justify-center shadow-lg">
+    <nav className="w-full shrink-0 h-[60px] border-t backdrop-blur-lg bg-[var(--bg-surface)]/95 border-[var(--border-color)] px-4 flex items-center justify-center shadow-lg z-40">
       <div className="w-full max-w-md mx-auto flex items-center justify-around">
         <button
           onClick={() => onTabChange('companion')}

@@ -338,7 +338,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--bg-main)] text-[var(--text-main)] transition-colors max-w-full overflow-x-hidden">
+    <div className="h-dvh flex flex-col bg-[var(--bg-main)] text-[var(--text-main)] transition-colors max-w-full overflow-hidden">
       <Header
         profile={profile}
         onUpdateProfile={handleUpdateProfile}
@@ -348,7 +348,7 @@ export default function App() {
         onOpenMaritalSupport={() => setIsMaritalSupportOpen(true)}
       />
 
-      <main className="flex-1 max-w-4xl w-full mx-auto p-2 pb-[65px]">
+      <main className="flex-1 max-w-4xl w-full mx-auto p-2 overflow-hidden flex flex-col min-h-0">
         {activeTab === 'companion' && (
           <CompanionView
             messages={messages}
@@ -362,24 +362,28 @@ export default function App() {
         )}
 
         {activeTab === 'saved' && (
-          <SavedView
-            items={items}
-            profile={profile}
-            onUpdateItem={handleUpdateItem}
-            onDeleteItem={handleDeleteItem}
-            onAddItem={handleAddItem}
-          />
+          <div className="h-full overflow-y-auto w-full">
+            <SavedView
+              items={items}
+              profile={profile}
+              onUpdateItem={handleUpdateItem}
+              onDeleteItem={handleDeleteItem}
+              onAddItem={handleAddItem}
+            />
+          </div>
         )}
 
         {activeTab === 'today' && (
-          <TodayView
-            items={items}
-            profile={profile}
-            onUpdateItem={handleUpdateItem}
-            onStartEndReview={handleStartEndReview}
-            reviewText={dailyReviewText}
-            isReviewing={isReviewing}
-          />
+          <div className="h-full overflow-y-auto w-full">
+            <TodayView
+              items={items}
+              profile={profile}
+              onUpdateItem={handleUpdateItem}
+              onStartEndReview={handleStartEndReview}
+              reviewText={dailyReviewText}
+              isReviewing={isReviewing}
+            />
+          </div>
         )}
       </main>
 

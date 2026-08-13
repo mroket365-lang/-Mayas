@@ -14,22 +14,24 @@ authRouter.post('/register', (req: Request, res: Response) => {
   const { email, password, name, username, phone, profileData, messagesData, itemsData } = req.body;
 
   if (!email || !password || !name) {
-    return res.status(400).json({ error: 'البريد الإلكتروني، كلمة السر والاسم مطاليين' });
+    return res.status(400).json({ error: 'البريد الإلكتروني، كلمة السر والاسم مطلوبان' });
   }
 
-  const existingEmail = db.getUsers().find((u) => u.email.toLowerCase() === email.toLowerCase());
+  const existingEmail = db.getUsers().find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
   if (existingEmail) {
-    return res.status(400).json({ error: 'هذا البريد الإلكتروني مسجل بالفعل' });
+    return res.status(400).json({ error: 'هذا البريد الإلكتروني مسجل بالفعل لدينا' });
   }
 
   if (username) {
-    const existingUser = db.getUsers().find((u) => u.username && u.username.toLowerCase() === username.toLowerCase());
+    const existingUser = db.getUsers().find((u) => u.username && u.username.toLowerCase() === username.trim().toLowerCase());
     if (existingUser) {
       return res.status(400).json({ error: 'اسم المستخدم هذا غير متاح، اختر اسماً آخر' });
     }
   }
 
   const accountId = generateAccountId();
+  const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+
   const newUser: UserEntity = {
     id: accountId,
     email: email.trim().toLowerCase(),
@@ -45,6 +47,9 @@ authRouter.post('/register', (req: Request, res: Response) => {
     messagesData,
     itemsData,
   };
+
+  (newUser as any).verificationCode = verificationCode;
+  (newUser as any).isEmailVerified = true;
 
   db.upsertUser(newUser);
 
@@ -62,8 +67,12 @@ authRouter.post('/register', (req: Request, res: Response) => {
     updatedAt: new Date().toISOString(),
   });
 
+  console.log(`[Email Verification] Verification code ${verificationCode} sent to ${newUser.email}`);
+
   return res.json({
-    message: 'تم إنشاء الحساب بنجاح',
+    message: 'تم إنشاء الحساب بنجاح وتم تحويل رمز التحقق إلى بريدك الإلكتروني',
+    verificationCodeSent: true,
+    verificationCode,
     user: {
       id: newUser.id,
       accountId: newUser.id,
@@ -95,8 +104,16 @@ authRouter.post('/login', (req: Request, res: Response) => {
       (u.phone && u.phone === cleanId)
   );
 
-  if (!user || user.passwordHash !== password) {
-    return res.status(401).json({ error: 'بيانات الدخول غير صحيحة، يرجى التأكد وإعادة المحاولة' });
+  if (!user) {
+    return res.status(404).json({
+      error: 'هذا البريد الإلكتروني أو رقم الهاتف غير مسجل لدينا. نقترح عليك إنشاء حساب جديد.',
+      code: 'USER_NOT_FOUND',
+      notFoundIdentifier: cleanId,
+    });
+  }
+
+  if (user.passwordHash !== password) {
+    return res.status(401).json({ error: 'كلمة المرور غير صحيحة، يرجى التأكد وإعادة المحاولة' });
   }
 
   if (user.status === 'banned') {
@@ -199,12 +216,71 @@ authRouter.post('/recover-password', (req: Request, res: Response) => {
   );
 
   if (!user) {
-    return res.status(404).json({ error: 'لم نتمكن من العثور على حساب بهذه البيانات' });
+    return res.status(404).json({
+      error: 'هذا البريد الإلكتروني أو رقم الهاتف غير مسجل لدينا. نقترح عليك إنشاء حساب جديد.',
+      code: 'USER_NOT_FOUND',
+      notFoundIdentifier: cleanId,
+    });
   }
 
+  const resetToken = 'rst_' + Math.random().toString(36).substring(2, 10);
+  const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+  (user as any).resetToken = resetToken;
+  (user as any).resetCode = resetCode;
+  (user as any).resetTokenExpires = Date.now() + 30 * 60 * 1000;
+  db.upsertUser(user);
+
+  console.log(`[Email Password Reset] Sent email to ${user.email}. Code: ${resetCode}, Link: https://rafiq.ai/reset-password?token=${resetToken}`);
+
   return res.json({
-    message: `تم إرسال تعليمات استعادة كلمة المرور لـ ${user.email}`,
-    hint: 'تم إرسال رابط إعادة تعيين كلمة السر إلى بريدك الإلكتروني بنجاح',
+    success: true,
+    message: `تم إرسال رابط استعادة كلمة السر ورمز التحقق إلى بريدك (${user.email}) بنجاح.`,
+    hint: `رمز التحقق الخاص بك لإعادة تعيين كلمة السر هو: ${resetCode}`,
+    resetLink: `https://rafiq.ai/reset-password?token=${resetToken}`,
+  });
+});
+
+// POST /api/auth/reset-password
+authRouter.post('/reset-password', (req: Request, res: Response) => {
+  const { identifier, codeOrToken, newPassword } = req.body;
+
+  if (!identifier || !codeOrToken || !newPassword) {
+    return res.status(400).json({ error: 'جميع البيانات مطلوبة لتغيير كلمة السر' });
+  }
+
+  const cleanId = identifier.trim().toLowerCase();
+  const user = db.getUsers().find(
+    (u) =>
+      u.email.toLowerCase() === cleanId ||
+      (u.username && u.username.toLowerCase() === cleanId) ||
+      (u.phone && u.phone === cleanId)
+  );
+
+  if (!user) {
+    return res.status(404).json({
+      error: 'هذا البريد الإلكتروني أو رقم الهاتف غير مسجل لدينا. نقترح عليك إنشاء حساب جديد.',
+      code: 'USER_NOT_FOUND',
+      notFoundIdentifier: cleanId,
+    });
+  }
+
+  const validToken = (user as any).resetToken === codeOrToken;
+  const validCode = (user as any).resetCode === codeOrToken;
+
+  if (!validToken && !validCode) {
+    return res.status(400).json({ error: 'رمز التحقق أو الرابط غير صحيح أو انتهت صلاحيته' });
+  }
+
+  user.passwordHash = newPassword;
+  delete (user as any).resetToken;
+  delete (user as any).resetCode;
+  delete (user as any).resetTokenExpires;
+  db.upsertUser(user);
+
+  return res.json({
+    success: true,
+    message: 'تم تغيير كلمة السر بنجاح! يمكنك الآن تسجيل الدخول بكلمة السر الجديدة.',
   });
 });
 

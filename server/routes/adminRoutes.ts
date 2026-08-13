@@ -635,8 +635,7 @@ adminRouter.delete('/assistants/:id', requireAdminAuth, requireSuperAdmin, (req:
   const assistantId = req.params.id;
   const session = (req as any).adminSession;
 
-  const users = db.getUsers().filter((u) => u.id !== assistantId);
-  db.saveUsers(users);
+  db.deleteUser(assistantId);
 
   db.addAuditLog({
     adminId: session.adminId,
@@ -646,4 +645,92 @@ adminRouter.delete('/assistants/:id', requireAdminAuth, requireSuperAdmin, (req:
   });
 
   return res.json({ success: true, message: 'تم حذف المساعد بنجاح' });
+});
+
+// 15. Payment Methods Management (طرق الدفع)
+adminRouter.get('/payment-methods', requireAdminAuth, (req: Request, res: Response) => {
+  return res.json(db.getPaymentMethods());
+});
+
+adminRouter.post('/payment-methods', requireAdminAuth, requireSuperAdmin, (req: Request, res: Response) => {
+  const { type, title, accountNumberOrDetails, accountHolder, instructions, enabled = true } = req.body;
+  const session = (req as any).adminSession;
+
+  if (!type || !title || !accountNumberOrDetails) {
+    return res.status(400).json({ error: 'نوع طريقة الدفع، العنوان، وتفاصيل الحساب مطلوبة' });
+  }
+
+  const newPm = {
+    id: `pm_${type}_${Date.now().toString(36)}`,
+    type: type as 'bank' | 'wallet' | 'card',
+    title: title.trim(),
+    accountNumberOrDetails: accountNumberOrDetails.trim(),
+    accountHolder: accountHolder ? accountHolder.trim() : undefined,
+    instructions: instructions ? instructions.trim() : undefined,
+    enabled: Boolean(enabled),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  db.upsertPaymentMethod(newPm);
+
+  db.addAuditLog({
+    adminId: session.adminId,
+    adminEmail: session.email,
+    action: 'ADD_PAYMENT_METHOD',
+    details: `Added new payment method: ${title} (${type}).`,
+  });
+
+  return res.json(newPm);
+});
+
+adminRouter.put('/payment-methods/:id', requireAdminAuth, requireSuperAdmin, (req: Request, res: Response) => {
+  const pmId = req.params.id;
+  const session = (req as any).adminSession;
+  const methods = db.getPaymentMethods();
+  const existing = methods.find((p) => p.id === pmId);
+
+  if (!existing) {
+    return res.status(404).json({ error: 'طريقة الدفع غير موجودة' });
+  }
+
+  const { type, title, accountNumberOrDetails, accountHolder, instructions, enabled } = req.body;
+
+  const updatedPm = {
+    ...existing,
+    type: type || existing.type,
+    title: title !== undefined ? title.trim() : existing.title,
+    accountNumberOrDetails: accountNumberOrDetails !== undefined ? accountNumberOrDetails.trim() : existing.accountNumberOrDetails,
+    accountHolder: accountHolder !== undefined ? accountHolder.trim() : existing.accountHolder,
+    instructions: instructions !== undefined ? instructions.trim() : existing.instructions,
+    enabled: enabled !== undefined ? Boolean(enabled) : existing.enabled,
+    updatedAt: new Date().toISOString(),
+  };
+
+  db.upsertPaymentMethod(updatedPm);
+
+  db.addAuditLog({
+    adminId: session.adminId,
+    adminEmail: session.email,
+    action: 'UPDATE_PAYMENT_METHOD',
+    details: `Updated payment method '${existing.title}' (${pmId}).`,
+  });
+
+  return res.json(updatedPm);
+});
+
+adminRouter.delete('/payment-methods/:id', requireAdminAuth, requireSuperAdmin, (req: Request, res: Response) => {
+  const pmId = req.params.id;
+  const session = (req as any).adminSession;
+
+  db.deletePaymentMethod(pmId);
+
+  db.addAuditLog({
+    adminId: session.adminId,
+    adminEmail: session.email,
+    action: 'DELETE_PAYMENT_METHOD',
+    details: `Deleted payment method ID: ${pmId}.`,
+  });
+
+  return res.json({ success: true, message: 'تم حذف طريقة الدفع بنجاح' });
 });

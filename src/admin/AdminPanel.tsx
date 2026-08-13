@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   Users,
   CreditCard,
+  Wallet,
   Package,
   Cpu,
   BarChart2,
@@ -16,6 +17,7 @@ import { AdminLogin } from './AdminLogin';
 import { AdminDashboardView } from './AdminDashboardView';
 import { AdminUsersView } from './AdminUsersView';
 import { AdminSubscriptionsView } from './AdminSubscriptionsView';
+import { AdminPaymentMethodsView } from './AdminPaymentMethodsView';
 import { AdminPlansView } from './AdminPlansView';
 import { AdminAIUsageView } from './AdminAIUsageView';
 import { AdminProvidersView } from './AdminProvidersView';
@@ -77,6 +79,7 @@ export const AdminPanel: React.FC = () => {
     { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
     { id: 'users', label: 'المستخدمون', icon: Users },
     { id: 'subscriptions', label: 'الاشتراكات', icon: CreditCard },
+    { id: 'payment_methods', label: 'طرق الدفع', icon: Wallet },
     { id: 'plans', label: 'الخطط والأسعار', icon: Package },
     { id: 'usage', label: 'تحليل الذكاء الاصطناعي', icon: BarChart2 },
     { id: 'providers', label: 'مزودو الذكاء الاصطناعي', icon: Cpu },
@@ -85,9 +88,9 @@ export const AdminPanel: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row">
+    <div className="h-dvh w-full bg-slate-950 text-slate-100 flex flex-col md:flex-row overflow-hidden">
       {/* Sidebar Nav */}
-      <aside className="w-full md:w-64 bg-slate-900 border-b md:border-b-0 md:border-l border-slate-800 p-4 flex flex-col justify-between shrink-0">
+      <aside className="w-full md:w-64 bg-slate-900 border-b md:border-b-0 md:border-l border-slate-800 p-4 flex flex-col justify-between shrink-0 overflow-y-auto max-h-[35vh] md:max-h-full">
         <div>
           <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800">
             <div className="flex items-center gap-2.5">
@@ -149,12 +152,13 @@ export const AdminPanel: React.FC = () => {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+      <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full overflow-y-auto h-full">
         {activeTab === 'dashboard' && (
           <AdminDashboardView stats={stats} onNavigate={(tab) => setActiveTab(tab)} />
         )}
         {activeTab === 'users' && <AdminUsersView token={token} />}
         {activeTab === 'subscriptions' && <AdminSubscriptionsView token={token} />}
+        {activeTab === 'payment_methods' && <AdminPaymentMethodsView token={token} />}
         {activeTab === 'plans' && <AdminPlansView token={token} />}
         {activeTab === 'usage' && <AdminAIUsageView token={token} />}
         {activeTab === 'providers' && <AdminProvidersView token={token} />}

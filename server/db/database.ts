@@ -107,6 +107,18 @@ export interface FeatureFlagConfig {
   allowedRegion?: string;
 }
 
+export interface PaymentMethodEntity {
+  id: string;
+  type: 'bank' | 'wallet' | 'card';
+  title: string;
+  accountNumberOrDetails: string;
+  accountHolder?: string;
+  instructions?: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SystemSettingsEntity {
   maintenanceMode: boolean;
   newRegistrationsEnabled: boolean;
@@ -123,6 +135,7 @@ export interface SystemSettingsEntity {
   maritalSupportVisibility?: FeatureFlagConfig;
   superAdminEmail?: string;
   superAdminPassword?: string;
+  paymentMethods?: PaymentMethodEntity[];
 }
 
 export interface DatabaseSchema {
@@ -264,6 +277,41 @@ const defaultDatabase: DatabaseSchema = {
     maritalSupportVisibility: { mode: 'hidden' },
     superAdminEmail: 'admin@rafiq.ai',
     superAdminPassword: 'AdminSecret2026!',
+    paymentMethods: [
+      {
+        id: 'pm_bank_01',
+        type: 'bank',
+        title: 'تحويل بنكي (البنك الأهلي / الراجحي)',
+        accountNumberOrDetails: 'EG120002000100000000012345678',
+        accountHolder: 'شركة رفيق للذكاء الاصطناعي',
+        instructions: 'يرجى تحويل مبلغ الاشتراك ثم رفع إيصال التحويل مع إدخال بريدك الحسابي للتفعيل المستمر.',
+        enabled: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'pm_wallet_01',
+        type: 'wallet',
+        title: 'محفظة إلكترونية (Vodafone Cash / STC Pay / InstaPay)',
+        accountNumberOrDetails: '01012345678 / +966501234567',
+        accountHolder: 'حساب رفيق الرسمي',
+        instructions: 'أرسل قيمة الاشتراك للمحفظة ثم أرفق رقم العملية لتنفيذ التفعيل الفوري.',
+        enabled: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'pm_card_01',
+        type: 'card',
+        title: 'بطاقة ائتمانية / الدفع الإلكتروني المباشر (Stripe / Visa)',
+        accountNumberOrDetails: 'بوابة الدفع الإلكتروني المباشر',
+        accountHolder: 'Stripe Secure Checkout',
+        instructions: 'دفع مباشر آمن ويتم تفعيل الخطة فور سداد القيمة بالبطاقة.',
+        enabled: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ],
   },
 };
 
@@ -459,10 +507,39 @@ class Database {
     return newLog;
   }
 
+  public deleteUser(id: string): void {
+    this.data.users = this.data.users.filter((u) => u.id !== id);
+    this.save();
+  }
+
   public updateSettings(partial: Partial<SystemSettingsEntity>): SystemSettingsEntity {
     this.data.settings = { ...this.data.settings, ...partial };
     this.save();
     return this.data.settings;
+  }
+
+  public getPaymentMethods(): PaymentMethodEntity[] {
+    return this.data.settings.paymentMethods || [];
+  }
+
+  public upsertPaymentMethod(pm: PaymentMethodEntity): PaymentMethodEntity {
+    if (!this.data.settings.paymentMethods) {
+      this.data.settings.paymentMethods = [];
+    }
+    const idx = this.data.settings.paymentMethods.findIndex((p) => p.id === pm.id);
+    if (idx >= 0) {
+      this.data.settings.paymentMethods[idx] = pm;
+    } else {
+      this.data.settings.paymentMethods.push(pm);
+    }
+    this.save();
+    return pm;
+  }
+
+  public deletePaymentMethod(id: string): void {
+    if (!this.data.settings.paymentMethods) return;
+    this.data.settings.paymentMethods = this.data.settings.paymentMethods.filter((p) => p.id !== id);
+    this.save();
   }
 }
 

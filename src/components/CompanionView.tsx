@@ -554,7 +554,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-125px)] max-w-2xl mx-auto relative">
+    <div className="flex flex-col h-full w-full max-w-2xl mx-auto relative min-h-0 overflow-hidden flex-1">
       {(profile.privateCandidMode || profile.personality === 'bold') && (
         <div className="mx-3 mt-2 px-3.5 py-2 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-rose-500/15 border border-amber-500/30 text-[11px] font-bold text-amber-600 dark:text-amber-400 flex items-center justify-between gap-2 shadow-sm animate-fade-in shrink-0">
           <div className="flex items-center gap-2">

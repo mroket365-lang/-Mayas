@@ -21,14 +21,17 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginSuccess }) => {
-  const [mode, setMode] = useState<'login' | 'register' | 'recover'>('register');
+  const [mode, setMode] = useState<'login' | 'register' | 'recover' | 'reset'>('register');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isNotFoundUser, setIsNotFoundUser] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   // Form Fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [codeOrToken, setCodeOrToken] = useState('');
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [phone, setPhone] = useState('');
@@ -37,10 +40,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
   const t = getTranslation(profile.language);
   const isArabic = profile.language === 'ar';
 
+  const handleSwitchToRegisterWithIdentifier = () => {
+    setIsNotFoundUser(false);
+    setError(null);
+    if (identifier.includes('@')) {
+      setEmail(identifier);
+    } else if (/^\+?[0-9]{7,15}$/.test(identifier)) {
+      setPhone(identifier);
+    } else if (identifier) {
+      setUsername(identifier);
+    }
+    setMode('register');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setIsNotFoundUser(false);
     setSuccessMsg(null);
 
     try {
@@ -60,7 +77,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'فشل إنشاء الحساب');
 
-        setSuccessMsg('تم إنشاء الحساب بنجاح! جاري حفظ بياناتك وتنشيط الحساب...');
+        setSuccessMsg('تم إنشاء الحساب بنجاح وتفعيل المزامنة! جاري فتح حسابك...');
         setTimeout(() => {
           onLoginSuccess(data.user);
           onClose();
@@ -76,7 +93,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'فشل تسجيل الدخول');
+        if (!res.ok) {
+          if (res.status === 404 || data.code === 'USER_NOT_FOUND') {
+            setIsNotFoundUser(true);
+          }
+          throw new Error(data.error || 'فشل تسجيل الدخول');
+        }
 
         setSuccessMsg('تم تسجيل الدخول بنجاح!');
         setTimeout(() => {
@@ -91,9 +113,37 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'لم يتم العثور على الحساب');
+        if (!res.ok) {
+          if (res.status === 404 || data.code === 'USER_NOT_FOUND') {
+            setIsNotFoundUser(true);
+          }
+          throw new Error(data.error || 'لم يتم العثور على الحساب');
+        }
 
-        setSuccessMsg(data.hint || 'تم إرسال تعليمات الاستعادة بنجاح');
+        setSuccessMsg(data.message || data.hint || 'تم إرسال رمز استعادة كلمة السر لبريدك بنجاح');
+        if (data.hint) {
+          setError(`تنبيه للتأكيد الاختباري: ${data.hint}`);
+        }
+        setMode('reset');
+      } else if (mode === 'reset') {
+        const res = await fetch('/api/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            identifier: identifier || email,
+            codeOrToken,
+            newPassword,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'فشلت إعادة تعيين كلمة السر');
+
+        setSuccessMsg(data.message || 'تمت إعادة تعيين كلمة السر بنجاح. يمكنك الآن تسجيل الدخول.');
+        setTimeout(() => {
+          setMode('login');
+          setPassword(newPassword);
+        }, 1500);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'حدث خطأ غير متوقع';
@@ -208,7 +258,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
           </button>
         </div>
 
-        {error && (
+        {isNotFoundUser && (
+          <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-700 dark:text-amber-300 text-xs space-y-2 animate-fade-in">
+            <p className="font-bold leading-relaxed">
+              {isArabic
+                ? 'هذا البريد الإلكتروني أو رقم الهاتف غير مسجل لدينا في النظام. نقترح عليك إنشاء حساب جديد للتأكد من حفظ بياناتك ومحادثاتك.'
+                : 'This email or phone number is not registered in our system. We suggest creating a new account.'}
+            </p>
+            <button
+              type="button"
+              onClick={handleSwitchToRegisterWithIdentifier}
+              className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-md"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>
+                {isArabic
+                  ? 'إنشاء حساب جديد بـ ' + (identifier || 'هذه البيانات')
+                  : 'Create account with ' + (identifier || 'this info')}
+              </span>
+            </button>
+          </div>
+        )}
+
+        {error && !isNotFoundUser && (
           <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-rose-600 dark:text-rose-400 text-xs font-bold animate-fade-in">
             {error}
           </div>
@@ -371,6 +443,41 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
                   placeholder="name@example.com"
                   className="w-full px-9 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-sage)]"
                 />
+              </div>
+            </div>
+          )}
+
+          {mode === 'reset' && (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="font-bold text-[var(--text-muted)] uppercase">
+                  {isArabic ? 'رمز التحقق المرسل لبريدك' : 'Verification Code'}
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={codeOrToken}
+                  onChange={(e) => setCodeOrToken(e.target.value)}
+                  placeholder="e.g. 849201"
+                  className="w-full px-4 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] font-mono text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-[var(--accent-sage)]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-[var(--text-muted)] uppercase">
+                  {isArabic ? 'كلمة المرور الجديدة' : 'New Password'}
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2 rtl:right-3 rtl:left-auto" />
+                  <input
+                    type="password"
+                    required
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                    className="w-full px-9 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-sage)]"
+                  />
+                </div>
               </div>
             </div>
           )}

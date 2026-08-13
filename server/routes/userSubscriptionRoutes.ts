@@ -61,6 +61,12 @@ userSubscriptionRouter.get('/plans', (req: Request, res: Response) => {
   return res.json(publicPlans);
 });
 
+// GET /api/payment-methods
+userSubscriptionRouter.get('/payment-methods', (req: Request, res: Response) => {
+  const activeMethods = db.getPaymentMethods().filter((p) => p.enabled);
+  return res.json(activeMethods);
+});
+
 // POST /api/user/checkout
 userSubscriptionRouter.post('/checkout', async (req: Request, res: Response) => {
   const { userId = 'user_default_01', planId, billingCycle = 'monthly', provider = 'stripe' } = req.body;
