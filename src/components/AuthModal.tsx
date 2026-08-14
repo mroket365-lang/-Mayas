@@ -299,7 +299,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
             <>
               <div className="space-y-1">
                 <label className="font-bold text-[var(--text-muted)] uppercase">
-                  {isArabic ? 'الاسم الكامل' : 'Full Name'}
+                  {isArabic ? 'الاسم' : 'Full Name'}
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2 rtl:right-3 rtl:left-auto" />
@@ -308,7 +308,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder={isArabic ? 'مثال: محمد علي' : 'Full Name'}
+                    placeholder={isArabic ? 'اسمك الكامل (مثال: محمد علي)' : 'Full Name'}
                     className="w-full px-9 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-sage)]"
                   />
                 </div>
@@ -328,37 +328,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
                     placeholder="name@example.com"
                     className="w-full px-9 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-sage)]"
                   />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="font-bold text-[var(--text-muted)] uppercase">
-                    {isArabic ? 'اسم المستخدم (اختياري)' : 'Username (Optional)'}
-                  </label>
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="e.g. user123"
-                    className="w-full px-3 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-sage)]"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-bold text-[var(--text-muted)] uppercase">
-                    {isArabic ? 'رقم الهاتف (اختياري)' : 'Phone (Optional)'}
-                  </label>
-                  <div className="relative">
-                    <Phone className="w-3.5 h-3.5 text-[var(--text-muted)] absolute left-2.5 top-1/2 -translate-y-1/2 rtl:right-2.5 rtl:left-auto" />
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+966 500 000 000"
-                      className="w-full px-8 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-sage)]"
-                    />
-                  </div>
                 </div>
               </div>
 

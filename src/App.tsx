@@ -120,6 +120,26 @@ export default function App() {
     alarmEngine.requestNotificationPermission();
   }, []);
 
+  // Automatic debounced cloud backup & synchronization for logged-in users
+  useEffect(() => {
+    if (!profile.id) return;
+
+    const syncTimer = setTimeout(() => {
+      fetch('/api/auth/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: profile.id,
+          profileData: profile,
+          messagesData: messages.slice(-100), // Keep last 100 messages synced
+          itemsData: items,
+        }),
+      }).catch((err) => console.warn('Background database sync notice:', err));
+    }, 2000);
+
+    return () => clearTimeout(syncTimer);
+  }, [profile, messages, items]);
+
   // Alarm Schedule Engine Loop
   useEffect(() => {
     const interval = setInterval(() => {
@@ -552,15 +572,30 @@ export default function App() {
           onLoginSuccess={(userData) => {
             if (userData.accountId || userData.id) {
               const defaultName = userData.name || (userData.email ? userData.email.split('@')[0] : profile.displayName);
-              handleUpdateProfile({
+              const restoredProfile: UserProfile = {
                 ...profile,
                 id: userData.accountId || userData.id,
                 email: userData.email,
                 username: userData.username || (userData.email ? userData.email.split('@')[0] : undefined),
                 phone: userData.phone || profile.phone,
                 displayName: defaultName,
-                addressAs: defaultName || profile.addressAs,
-              });
+                addressAs: userData.profileData?.addressAs || profile.addressAs || defaultName,
+                ...(userData.profileData || {}),
+              };
+
+              handleUpdateProfile(restoredProfile);
+
+              // Restore messages if present from server database
+              if (userData.messagesData && Array.isArray(userData.messagesData) && userData.messagesData.length > 0) {
+                setMessages(userData.messagesData);
+                storageService.saveMessages(userData.messagesData);
+              }
+
+              // Restore items if present from server database
+              if (userData.itemsData && Array.isArray(userData.itemsData) && userData.itemsData.length > 0) {
+                setItems(userData.itemsData);
+                storageService.saveItems(userData.itemsData);
+              }
             }
           }}
         />
