@@ -27,6 +27,13 @@ export interface ActionSummary {
   itemId?: string;
 }
 
+export interface SubTask {
+  id: string;
+  title: string;
+  completed: boolean;
+  createdAt?: string;
+}
+
 export interface CompanionItem {
   id: string;
   userId: string;
@@ -44,10 +51,15 @@ export interface CompanionItem {
   repeatRule?: 'none' | 'daily' | 'weekly' | 'monthly' | 'specific_days';
   repeatDays?: number[]; // 0=Sunday, 1=Monday...
   streak?: number;
+  bestStreak?: number;
+  completedDates?: string[];
+  icon?: string;
   category?: string;
   memoryKey?: string;
   snoozedUntil?: string;
   completedAt?: string;
+  subtasks?: SubTask[];
+  progressPercent?: number; // 0 to 100
 }
 
 export interface ChatMessage {

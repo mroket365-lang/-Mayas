@@ -163,6 +163,57 @@ export class SubscriptionService {
     return db.incrementUsage(userId, period, featureKey, amount);
   }
 
+  /**
+   * Helper to calculate complete stats for a user:
+   * Tokens, Points (1 point = 5 tokens), Messages, Voice (minutes & seconds), Multi-AI, Advanced AI
+   */
+  public static getUserFullStats(userId: string) {
+    const period = this.getCurrentPeriod();
+    const usageRecords = db.getUsageRecords().filter((r) => r.userId === userId && r.period === period);
+    const aiLogs = db.getAIUsageLogs().filter((l) => l.userId === userId);
+
+    let messagesCount = 0;
+    let voiceSeconds = 0;
+    let multiAiCount = 0;
+    let advancedAiCount = 0;
+    let tokensUsed = 0;
+
+    usageRecords.forEach((r) => {
+      if (r.feature === 'ai_messages') messagesCount += r.count;
+      else if (r.feature === 'voice_seconds') voiceSeconds += r.count;
+      else if (r.feature === 'voice_minutes') voiceSeconds += r.count * 60;
+      else if (r.feature === 'multi_ai') multiAiCount += r.count;
+      else if (r.feature === 'advanced_ai') advancedAiCount += r.count;
+      else if (r.feature === 'tokens_used') tokensUsed += r.count;
+    });
+
+    // Also sum from AI Logs if tokens not explicitly counted in usageRecords
+    let logsTokens = 0;
+    let logsCostUSD = 0;
+    aiLogs.forEach((l) => {
+      logsTokens += (l.tokensInput || 0) + (l.tokensOutput || 0);
+      logsCostUSD += l.estimatedCost || 0;
+    });
+
+    const totalTokens = Math.max(tokensUsed, logsTokens);
+    const pointsUsed = Math.floor(totalTokens / 5); // 1 point = 5 tokens
+    const voiceMinutes = Number((voiceSeconds / 60).toFixed(1));
+
+    return {
+      period,
+      tokensUsed: totalTokens,
+      pointsUsed, // 1 point = 5 tokens
+      pointsToTokensRatio: 5, // Rule: 1 point = 5 tokens
+      messagesCount,
+      voiceSeconds,
+      voiceMinutes,
+      multiAiCount,
+      advancedAiCount,
+      estimatedCostUSD: Number(logsCostUSD.toFixed(4)),
+      totalLogsCount: aiLogs.length,
+    };
+  }
+
   public static getCurrentPeriod(): string {
     const d = new Date();
     const month = String(d.getMonth() + 1).padStart(2, '0');

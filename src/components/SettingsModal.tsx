@@ -11,6 +11,7 @@ import {
   Sun,
   Globe,
   User,
+  Settings,
   ShieldCheck,
   Mic,
   Video,
@@ -24,6 +25,8 @@ import {
   Crown,
 } from 'lucide-react';
 
+import { SystemPublicSettings } from '../App';
+
 interface SettingsModalProps {
   profile: UserProfile;
   onSaveProfile: (updated: UserProfile) => void;
@@ -33,6 +36,7 @@ interface SettingsModalProps {
   onOpenMaritalSupport?: () => void;
   onOpenSubscription?: () => void;
   onOpenAuth?: () => void;
+  systemSettings?: SystemPublicSettings | null;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -44,6 +48,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onOpenMaritalSupport,
   onOpenSubscription,
   onOpenAuth,
+  systemSettings,
 }) => {
   const [localProfile, setLocalProfile] = useState<UserProfile>({ ...profile });
   const t = getTranslation(localProfile.language);
@@ -104,16 +109,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="flex items-center justify-between border-b pb-4 border-[var(--border-color)]">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-2xl bg-[var(--accent-sage)]/15 text-[var(--accent-sage)]">
-              <User className="w-6 h-6" />
+              <Settings className="w-6 h-6" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-[var(--text-main)]">
-                {localProfile.language === 'ar' ? 'البروفايل والتفضيلات' : 'Profile & Preferences'}
+                {localProfile.language === 'ar' ? 'الإعدادات والتفضيلات' : 'Settings & Preferences'}
               </h2>
               <p className="text-xs text-[var(--text-muted)] font-medium">
                 {localProfile.language === 'ar'
-                  ? 'إدارة إعدادات الملف الشخصي، اللغة، الأذونات وتخصيص الرفيق'
-                  : 'Manage profile settings, language, permissions, and companion persona'}
+                  ? 'تخصيص اللغة، نمط الرفيق، الأذونات، المظهر والخصوصية'
+                  : 'Customize language, companion persona, permissions, theme & privacy'}
               </p>
             </div>
           </div>
@@ -129,13 +134,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* SECTION 1: Profile & Preferences Header & Content */}
         <div className="space-y-6">
-          <div className="flex items-center gap-2 pb-2 border-b border-[var(--border-color)] text-[var(--accent-sage)] font-bold text-sm">
-            <Sliders className="w-4 h-4" />
-            <span className="uppercase tracking-wider text-xs">
-              {localProfile.language === 'ar' ? 'الملف الشخصي والتفضيلات (Profile & Preferences)' : 'Profile & Preferences'}
-            </span>
-          </div>
-
           {/* 1. Language Selection (تغيير اللغة) */}
           <div className="p-5 rounded-2xl bg-[var(--bg-main)] border border-[var(--border-color)] space-y-3">
             <div className="flex items-center justify-between">
@@ -264,66 +262,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          {/* Subscription & Plans Section */}
-          {onOpenSubscription && (
-            <div className="p-4 rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-amber-500/20 text-amber-500">
-                    <Crown className="w-5 h-5 animate-pulse" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-[var(--text-main)]">
-                      {localProfile.language === 'ar' ? 'باقة الاشتراك والترقية' : 'Subscription & Pro Plans'}
-                    </h4>
-                    <p className="text-[10px] text-[var(--text-muted)]">
-                      {localProfile.language === 'ar' ? 'احصل على محادثات غير محدودة، سرعة فائقة ودعم لجميع نماذج AI' : 'Get unlimited AI messages and premium features'}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={onOpenSubscription}
-                  className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-extrabold transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20 shrink-0"
-                >
-                  <Crown className="w-3.5 h-3.5 text-amber-100" />
-                  <span>{localProfile.language === 'ar' ? 'إدارة الاشتراك والترقية ✨' : 'Manage Subscription ✨'}</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Account & Synchronization Section */}
-          <div className="p-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-hover)] space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-[var(--accent-sage)]/10 text-[var(--accent-sage)]">
-                  <UserCheck className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-[var(--text-main)]">
-                    {localProfile.language === 'ar' ? 'حساب المستخدم ومزامنة البيانات' : 'User Account & Sync'}
-                  </h4>
-                  <p className="text-[10px] text-[var(--text-muted)] font-mono">
-                    ID: {localProfile.id || 'USR-LOCAL'}
-                  </p>
-                </div>
-              </div>
-
-              {onOpenAuth && (
-                <button
-                  type="button"
-                  onClick={onOpenAuth}
-                  className="px-3 py-1.5 rounded-xl bg-[var(--accent-sage)] text-white text-xs font-bold hover:opacity-90 transition-all flex items-center gap-1.5 shadow-sm shrink-0"
-                >
-                  <LogIn className="w-3.5 h-3.5" />
-                  <span>{localProfile.language === 'ar' ? 'إنشاء حساب / دخول' : 'Account Login'}</span>
-                </button>
-              )}
-            </div>
-          </div>
-
           {/* 3. Display Name & Address As */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -432,38 +370,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           {/* 4.5 Private Candid Conversations Mode Toggle */}
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-rose-500/10 border border-amber-500/30 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-600 shrink-0">
-                  <Flame className="w-5 h-5 text-amber-500 animate-pulse" />
+          {systemSettings?.privateCandidAllowed !== false && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-rose-500/10 border border-amber-500/30 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-amber-500/20 text-amber-600 shrink-0">
+                    <Flame className="w-5 h-5 text-amber-500 animate-pulse" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-extrabold text-[var(--text-main)] flex items-center gap-2">
+                      <span>{t.privateCandidTitle}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 font-bold border border-amber-500/30">
+                        {localProfile.language === 'ar' ? 'نمط صريح وخاص' : 'Candid Mode'}
+                      </span>
+                    </h4>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">
+                      {t.privateCandidDesc}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-sm font-extrabold text-[var(--text-main)] flex items-center gap-2">
-                    <span>{t.privateCandidTitle}</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 font-bold border border-amber-500/30">
-                      {localProfile.language === 'ar' ? 'نمط صريح وخاص' : 'Candid Mode'}
-                    </span>
-                  </h4>
-                  <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">
-                    {t.privateCandidDesc}
-                  </p>
-                </div>
-              </div>
 
-              <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                <input
-                  type="checkbox"
-                  checked={localProfile.privateCandidMode || localProfile.personality === 'bold'}
-                  onChange={(e) =>
-                    setLocalProfile({ ...localProfile, privateCandidMode: e.target.checked })
-                  }
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-amber-500 peer-checked:to-orange-500"></div>
-              </label>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={localProfile.privateCandidMode || localProfile.personality === 'bold'}
+                    onChange={(e) =>
+                      setLocalProfile({ ...localProfile, privateCandidMode: e.target.checked })
+                    }
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-amber-500 peer-checked:to-orange-500"></div>
+                </label>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* 4.6 Marital Intimacy & Special Needs Counseling Card */}
           {onOpenMaritalSupport && (

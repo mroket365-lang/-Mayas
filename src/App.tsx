@@ -9,14 +9,17 @@ import { BottomNav } from './components/BottomNav';
 import { CompanionView } from './components/CompanionView';
 import { SavedView } from './components/SavedView';
 import { TodayView } from './components/TodayView';
+import { ProfileView } from './components/ProfileView';
 import { OnboardingModal } from './components/OnboardingModal';
 import { SettingsModal } from './components/SettingsModal';
 import { AlarmModal } from './components/AlarmModal';
 import { PermissionsModal } from './components/PermissionsModal';
 import { SubscriptionModal } from './components/SubscriptionModal';
+import { StatsModal } from './components/StatsModal';
 import { MaritalCounselingModal } from './components/MaritalCounselingModal';
 import { AuthModal } from './components/AuthModal';
 import { AdminPanel } from './admin/AdminPanel';
+import { realtimeClient } from './services/realtimeClient';
 
 export interface SystemPublicSettings {
   maintenanceMode: boolean;
@@ -40,13 +43,14 @@ export default function App() {
   const [profile, setProfile] = useState<UserProfile>(() => storageService.getProfile());
   const [items, setItems] = useState<CompanionItem[]>(() => storageService.getItems());
   const [messages, setMessages] = useState<ChatMessage[]>(() => storageService.getMessages());
-  const [activeTab, setActiveTab] = useState<'companion' | 'saved' | 'today'>('companion');
+  const [activeTab, setActiveTab] = useState<'companion' | 'saved' | 'today' | 'profile'>('companion');
 
   const [systemSettings, setSystemSettings] = useState<SystemPublicSettings | null>(null);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
   const [isSubscriptionOpen, setIsSubscriptionOpen] = useState(false);
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isMaritalSupportOpen, setIsMaritalSupportOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [ringingAlarm, setRingingAlarm] = useState<CompanionItem | null>(null);
@@ -54,64 +58,39 @@ export default function App() {
   const [dailyReviewText, setDailyReviewText] = useState<string>('');
   const [isReviewing, setIsReviewing] = useState(false);
 
-  // Real-Time System Settings Synchronization (< 10 seconds guarantee)
-  const syncSystemSettings = useCallback(async () => {
-    try {
-      const query = new URLSearchParams({
-        _t: Date.now().toString(),
-        userId: profile.id || '',
-        email: profile.email || '',
-      });
-      const res = await fetch(`/api/public/settings?${query.toString()}`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          Pragma: 'no-cache',
-        },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSystemSettings(data);
-      }
-    } catch (e) {
-      console.warn('Sync settings error:', e);
-    }
-  }, [profile.id, profile.email]);
+  const handleLogout = () => {
+    const guestProfile: UserProfile = {
+      ...profile,
+      id: undefined,
+      email: undefined,
+      username: undefined,
+      displayName: 'غالي',
+      addressAs: 'يا غالي',
+    };
+    handleUpdateProfile(guestProfile);
+  };
 
+  // Sub-second Real-Time System Settings & Variables Synchronization (< 1 second across all screens)
   useEffect(() => {
-    syncSystemSettings();
+    realtimeClient.init(profile.id || 'user_default_01', profile.email || '');
 
-    // Fast 3-second polling loop to guarantee immediate < 10 second updates from Admin Control Panel
-    const interval = setInterval(syncSystemSettings, 3000);
+    const unsubscribe = realtimeClient.subscribe('settings', (settingsData: SystemPublicSettings) => {
+      setSystemSettings(settingsData);
+    });
 
-    const handleFocusOrVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        syncSystemSettings();
+    const handleCustomSync = (e: any) => {
+      if (e.detail) {
+        setSystemSettings((prev) => ({ ...prev, ...e.detail }));
       }
     };
 
-    window.addEventListener('focus', handleFocusOrVisibility);
-    document.addEventListener('visibilitychange', handleFocusOrVisibility);
-    window.addEventListener('system_settings_updated', syncSystemSettings);
-
-    let bc: BroadcastChannel | null = null;
-    try {
-      bc = new BroadcastChannel('rafiq_settings_sync');
-      bc.onmessage = () => {
-        syncSystemSettings();
-      };
-    } catch (e) {
-      // ignore
-    }
+    window.addEventListener('system_settings_updated', handleCustomSync);
 
     return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', handleFocusOrVisibility);
-      document.removeEventListener('visibilitychange', handleFocusOrVisibility);
-      window.removeEventListener('system_settings_updated', syncSystemSettings);
-      if (bc) bc.close();
+      unsubscribe();
+      window.removeEventListener('system_settings_updated', handleCustomSync);
     };
-  }, [syncSystemSettings]);
+  }, [profile.id, profile.email]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -438,6 +417,8 @@ export default function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenPermissions={() => setIsPermissionsOpen(true)}
         onOpenSubscription={() => setIsSubscriptionOpen(true)}
+        onOpenStats={() => setIsStatsOpen(true)}
+        systemSettings={systemSettings}
         onOpenMaritalSupport={
           systemSettings?.maritalSupportAllowed !== false
             ? () => setIsMaritalSupportOpen(true)
@@ -476,9 +457,27 @@ export default function App() {
               items={items}
               profile={profile}
               onUpdateItem={handleUpdateItem}
+              onAddItem={handleAddItem}
+              onDeleteItem={handleDeleteItem}
               onStartEndReview={handleStartEndReview}
               reviewText={dailyReviewText}
               isReviewing={isReviewing}
+            />
+          </div>
+        )}
+
+        {activeTab === 'profile' && (
+          <div className="h-full overflow-y-auto w-full">
+            <ProfileView
+              profile={profile}
+              items={items}
+              systemSettings={systemSettings}
+              onUpdateProfile={handleUpdateProfile}
+              onNavigateTab={setActiveTab}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+              onOpenSubscription={() => setIsSubscriptionOpen(true)}
+              onOpenAuth={() => setIsAuthOpen(true)}
+              onLogout={handleLogout}
             />
           </div>
         )}
@@ -514,9 +513,19 @@ export default function App() {
         />
       )}
 
+      {isStatsOpen && (
+        <StatsModal
+          isOpen={isStatsOpen}
+          onClose={() => setIsStatsOpen(false)}
+          items={items}
+          profile={profile}
+        />
+      )}
+
       {isSettingsOpen && (
         <SettingsModal
           profile={profile}
+          systemSettings={systemSettings}
           onSaveProfile={handleUpdateProfile}
           onClose={() => setIsSettingsOpen(false)}
           onClearMemory={handleClearMemory}
@@ -542,10 +551,15 @@ export default function App() {
           onClose={() => setIsAuthOpen(false)}
           onLoginSuccess={(userData) => {
             if (userData.accountId || userData.id) {
+              const defaultName = userData.name || (userData.email ? userData.email.split('@')[0] : profile.displayName);
               handleUpdateProfile({
                 ...profile,
                 id: userData.accountId || userData.id,
-                addressAs: userData.name || profile.addressAs,
+                email: userData.email,
+                username: userData.username || (userData.email ? userData.email.split('@')[0] : undefined),
+                phone: userData.phone || profile.phone,
+                displayName: defaultName,
+                addressAs: defaultName || profile.addressAs,
               });
             }
           }}

@@ -579,8 +579,17 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
       liveTranscript ||
       (profile.language === 'ar' ? '🎙️ تسجيل صوتي' : '🎙️ Voice recording');
 
+    const durationSecondsRecorded = recordingSeconds || 5;
+
     setVoiceInterimText('');
     accumulatedTranscriptRef.current = '';
+
+    // Record voice usage in background
+    fetch('/api/user/record-voice-usage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: profile.id || 'user_default_01', seconds: durationSecondsRecorded }),
+    }).catch(() => {});
 
     // Send message to AI
     await onSendMessage(textToSend, audioMedia || attachedMedia || undefined);

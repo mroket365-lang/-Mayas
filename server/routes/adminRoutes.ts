@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { db, UserEntity, PlanEntity } from '../db/database.js';
 import { SubscriptionService } from '../services/subscriptionService.js';
+import { realtimeSyncService } from '../services/realtimeSyncService.js';
 
 export const adminRouter = Router();
 
@@ -253,6 +254,7 @@ adminRouter.get('/users/:id', requireAdminAuth, (req: Request, res: Response) =>
   const usageRecords = db.getUsageRecords().filter((r) => r.userId === userId && r.period === usagePeriod);
   const history = db.getSubscriptionHistory().filter((h) => h.userId === userId);
   const aiLogs = db.getAIUsageLogs().filter((l) => l.userId === userId).slice(0, 50);
+  const stats = SubscriptionService.getUserFullStats(userId);
 
   return res.json({
     user,
@@ -262,6 +264,7 @@ adminRouter.get('/users/:id', requireAdminAuth, (req: Request, res: Response) =>
     usageRecords,
     subscriptionHistory: history,
     recentAILogsCount: aiLogs.length,
+    stats, // includes tokensUsed, pointsUsed (1pt=5tokens), messagesCount, voiceMinutes
   });
 });
 
@@ -279,6 +282,7 @@ adminRouter.post('/users/:id/action', requireAdminAuth, (req: Request, res: Resp
   try {
     if (action === 'grant_premium' || action === 'change_plan') {
       const sub = SubscriptionService.grantManualPremium(userId, planId, Number(durationDays) || 30, session.adminId, session.email);
+      realtimeSyncService.broadcast('subscription_updated', { userId, planId, sub });
       return res.json({ success: true, message: `Successfully updated user plan to ${planId}`, subscription: sub });
     }
 
@@ -292,6 +296,7 @@ adminRouter.post('/users/:id/action', requireAdminAuth, (req: Request, res: Resp
         targetUserId: userId,
         details: `Suspended account for user ${user.email}. Reason: ${reason || 'None provided'}`,
       });
+      realtimeSyncService.broadcast('user_updated', { userId, status: 'suspended' });
       return res.json({ success: true, message: `User ${user.email} suspended successfully.` });
     }
 
@@ -305,6 +310,7 @@ adminRouter.post('/users/:id/action', requireAdminAuth, (req: Request, res: Resp
         targetUserId: userId,
         details: `Reactivated account for user ${user.email}.`,
       });
+      realtimeSyncService.broadcast('user_updated', { userId, status: 'active' });
       return res.json({ success: true, message: `User ${user.email} reactivated successfully.` });
     }
 
@@ -318,6 +324,7 @@ adminRouter.post('/users/:id/action', requireAdminAuth, (req: Request, res: Resp
         targetUserId: userId,
         details: `Reset usage counters for user ${user.email} for period ${period}.`,
       });
+      realtimeSyncService.broadcast('user_usage_reset', { userId, period });
       return res.json({ success: true, message: `Usage reset for user ${user.email}.` });
     }
 
@@ -336,6 +343,7 @@ adminRouter.post('/users/:id/action', requireAdminAuth, (req: Request, res: Resp
           details: `Subscription cancelled by admin ${session.email}.`,
         });
       }
+      realtimeSyncService.broadcast('subscription_updated', { userId, status: 'cancelled' });
       return res.json({ success: true, message: 'Subscription cancelled.' });
     }
 
@@ -392,6 +400,8 @@ adminRouter.post('/plans', requireAdminAuth, requireSuperAdmin, (req: Request, r
     details: `Created new subscription plan: '${name}' (${newPlan.id}).`,
   });
 
+  realtimeSyncService.broadcast('plans_updated', { plan: newPlan });
+
   return res.json(newPlan);
 });
 
@@ -427,6 +437,8 @@ adminRouter.put('/plans/:id', requireAdminAuth, requireSuperAdmin, (req: Request
     action: 'UPDATE_PLAN',
     details: `Updated plan '${planId}' configuration and limits.`,
   });
+
+  realtimeSyncService.broadcast('plans_updated', { plan: updatedPlan });
 
   return res.json(updatedPlan);
 });
@@ -523,6 +535,8 @@ adminRouter.post('/providers', requireAdminAuth, requireSuperAdmin, (req: Reques
     details: `Updated AI Provider '${provider}' config: enabled=${enabled}, model=${model}.`,
   });
 
+  realtimeSyncService.broadcast('providers_updated', updatedProviders);
+
   return res.json(updatedProviders);
 });
 
@@ -565,6 +579,8 @@ adminRouter.put('/settings', requireAdminAuth, requireSuperAdmin, (req: Request,
     action: 'UPDATE_SYSTEM_SETTINGS',
     details: 'Updated global system settings and feature flags.',
   });
+
+  realtimeSyncService.broadcast('settings_updated', updated);
 
   return res.json(updated);
 });
@@ -681,6 +697,8 @@ adminRouter.post('/payment-methods', requireAdminAuth, requireSuperAdmin, (req: 
     details: `Added new payment method: ${title} (${type}).`,
   });
 
+  realtimeSyncService.broadcast('payment_methods_updated', newPm);
+
   return res.json(newPm);
 });
 
@@ -716,6 +734,8 @@ adminRouter.put('/payment-methods/:id', requireAdminAuth, requireSuperAdmin, (re
     details: `Updated payment method '${existing.title}' (${pmId}).`,
   });
 
+  realtimeSyncService.broadcast('payment_methods_updated', updatedPm);
+
   return res.json(updatedPm);
 });
 
@@ -731,6 +751,8 @@ adminRouter.delete('/payment-methods/:id', requireAdminAuth, requireSuperAdmin, 
     action: 'DELETE_PAYMENT_METHOD',
     details: `Deleted payment method ID: ${pmId}.`,
   });
+
+  realtimeSyncService.broadcast('payment_methods_updated', { deletedId: pmId });
 
   return res.json({ success: true, message: 'تم حذف طريقة الدفع بنجاح' });
 });

@@ -26,6 +26,18 @@ export function validateAndExecuteActions(
       const title = (args.title || 'Untitled').trim();
       if (!title) continue;
 
+      const rawSubtasks = Array.isArray(args.subtasks) ? args.subtasks : [];
+      const parsedSubtasks = rawSubtasks
+        .map((st: any, idx: number) => {
+          const stTitle = typeof st === 'string' ? st : st?.title || st?.name || '';
+          return {
+            id: 'st_' + Date.now() + '_' + idx,
+            title: String(stTitle).trim(),
+            completed: false,
+          };
+        })
+        .filter((st: { title: string }) => st.title.length > 0);
+
       const newItem: CompanionItem = {
         id: 'item_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
         userId: 'user_local',
@@ -41,6 +53,8 @@ export function validateAndExecuteActions(
         person: args.person || undefined,
         priority: (args.priority as CompanionItem['priority']) || 'medium',
         repeatRule: (args.repeatRule as CompanionItem['repeatRule']) || 'none',
+        subtasks: parsedSubtasks.length > 0 ? parsedSubtasks : undefined,
+        progressPercent: 0,
       };
 
       createdOrUpdatedItems.push(newItem);

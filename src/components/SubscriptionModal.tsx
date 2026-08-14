@@ -22,48 +22,67 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
   const [processingPlanId, setProcessingPlanId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const fetchOpts = {
-          cache: 'no-store' as RequestCache,
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            Pragma: 'no-cache',
-          },
-        };
-        const [statusRes, plansRes, methodsRes] = await Promise.all([
-          fetch(`/api/subscription/status?userId=${userId}&_t=${Date.now()}`, fetchOpts),
-          fetch(`/api/subscription/plans?_t=${Date.now()}`, fetchOpts),
-          fetch(`/api/payment-methods?_t=${Date.now()}`, fetchOpts),
-        ]);
+  const fetchData = async () => {
+    try {
+      const fetchOpts = {
+        cache: 'no-store' as RequestCache,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
+      };
+      const [statusRes, plansRes, methodsRes] = await Promise.all([
+        fetch(`/api/subscription/status?userId=${userId}&_t=${Date.now()}`, fetchOpts),
+        fetch(`/api/subscription/plans?_t=${Date.now()}`, fetchOpts),
+        fetch(`/api/payment-methods?_t=${Date.now()}`, fetchOpts),
+      ]);
 
-        if (statusRes.ok) {
-          const statusJson = await statusRes.json();
-          setStatusData(statusJson);
-        }
-
-        if (plansRes.ok) {
-          const plansJson = await plansRes.json();
-          setPlans(plansJson.filter((p: any) => p.active));
-        }
-
-        if (methodsRes.ok) {
-          const methodsJson = await methodsRes.json();
-          setPaymentMethods(methodsJson);
-          if (methodsJson.length > 0) {
-            setSelectedMethodId(methodsJson[0].id);
-          }
-        }
-      } catch (err) {
-        console.error('Fetch subscription data error:', err);
-      } finally {
-        setLoading(false);
+      if (statusRes.ok) {
+        const statusJson = await statusRes.json();
+        setStatusData(statusJson);
       }
+
+      if (plansRes.ok) {
+        const plansJson = await plansRes.json();
+        setPlans(plansJson.filter((p: any) => p.active));
+      }
+
+      if (methodsRes.ok) {
+        const methodsJson = await methodsRes.json();
+        setPaymentMethods(methodsJson);
+        if (methodsJson.length > 0 && !methodsJson.find((m: any) => m.id === selectedMethodId)) {
+          setSelectedMethodId(methodsJson[0].id);
+        }
+      }
+    } catch (err) {
+      console.error('Fetch subscription data error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setLoading(true);
+    fetchData();
+
+    // Listen for realtime server push and local admin updates (< 1s sync)
+    const handleRealtimeUpdate = () => {
+      fetchData();
     };
 
-    fetchData();
+    window.addEventListener('payment_methods_updated', handleRealtimeUpdate);
+    window.addEventListener('plans_updated', handleRealtimeUpdate);
+    window.addEventListener('subscription_updated', handleRealtimeUpdate);
+    window.addEventListener('system_settings_updated', handleRealtimeUpdate);
+    window.addEventListener('rafiq_realtime_event', handleRealtimeUpdate);
+
+    return () => {
+      window.removeEventListener('payment_methods_updated', handleRealtimeUpdate);
+      window.removeEventListener('plans_updated', handleRealtimeUpdate);
+      window.removeEventListener('subscription_updated', handleRealtimeUpdate);
+      window.removeEventListener('system_settings_updated', handleRealtimeUpdate);
+      window.removeEventListener('rafiq_realtime_event', handleRealtimeUpdate);
+    };
   }, [userId]);
 
   const selectedMethod = paymentMethods.find((m) => m.id === selectedMethodId);
@@ -158,36 +177,94 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Current Active Plan Card */}
+            {/* Current Active Plan & Usage Statistics Card */}
             {statusData && (
-              <div className="p-4 sm:p-5 rounded-2xl bg-[var(--bg-main)] border border-[var(--border-color)] flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-[var(--text-muted)]">{isArabic ? 'خاطتك الحالية:' : 'Current Plan:'}</span>
-                    <span className="font-extrabold text-amber-500 text-sm flex items-center gap-1">
-                      {statusData.plan?.id !== 'free' && <Crown className="w-4 h-4" />}
-                      {statusData.plan?.name}
-                    </span>
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
-                      {statusData.status}
-                    </span>
-                  </div>
-
-                  <div className="text-xs text-[var(--text-muted)] mt-1.5">
-                    <p>
-                      {isArabic ? 'استخدام رسائل الذكاء الاصطناعي:' : 'AI Message usage:'}{' '}
-                      <strong className="text-[var(--text-main)] font-mono">
-                        {statusData.usage?.ai_messages?.count || 0} / {statusData.plan?.limits?.ai_messages_per_month}
-                      </strong>
+              <div className="p-4 sm:p-5 rounded-2xl bg-[var(--bg-main)] border border-[var(--border-color)] space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-[var(--text-muted)]">{isArabic ? 'خطتك الحالية:' : 'Current Plan:'}</span>
+                      <span className="font-extrabold text-amber-500 text-sm flex items-center gap-1">
+                        {statusData.plan?.id !== 'free' && <Crown className="w-4 h-4" />}
+                        {statusData.plan?.name}
+                      </span>
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                        {statusData.subscription?.status || statusData.status || 'Active'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                      {isArabic ? 'فترة الاستخدام الحالية:' : 'Billing Period:'}{' '}
+                      <span className="font-mono text-[var(--text-main)] font-semibold">{statusData.period}</span>
                     </p>
                   </div>
+
+                  {statusData.plan?.id === 'free' && (
+                    <span className="text-xs text-amber-500 font-bold bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-xl">
+                      {isArabic ? 'ترقية متاحة الآن ✨' : 'Upgrade Available ✨'}
+                    </span>
+                  )}
                 </div>
 
-                {statusData.plan?.id === 'free' && (
-                  <span className="text-xs text-amber-500 font-bold bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-xl">
-                    {isArabic ? 'ترقية متاحة الآن ✨' : 'Upgrade Available ✨'}
-                  </span>
-                )}
+                {/* Detailed Usage Statistics Grid (Tokens, Points: 1 pt = 5 tokens, Messages, Voice) */}
+                <div className="pt-2 border-t border-[var(--border-color)]">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-black text-[var(--text-main)] flex items-center gap-1.5">
+                      <Zap className="w-4 h-4 text-amber-500" />
+                      <span>{isArabic ? 'إحصائيات الاستهلاك والنقاط' : 'Consumption & Points Stats'}</span>
+                    </span>
+                    <span className="text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-full">
+                      {isArabic ? '1 نقطة = 5 توكن' : '1 Point = 5 Tokens'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+                    {/* 1. Tokens Used */}
+                    <div className="p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)]">
+                      <span className="text-[10px] font-bold text-[var(--text-muted)] block">
+                        {isArabic ? 'التوكنات المستخدمة' : 'Tokens Used'}
+                      </span>
+                      <p className="text-base sm:text-lg font-black text-indigo-500 dark:text-indigo-400 mt-1 font-mono">
+                        {(statusData.stats?.tokensUsed ?? 0).toLocaleString()}
+                      </p>
+                    </div>
+
+                    {/* 2. Points (1 point = 5 tokens) */}
+                    <div className="p-3 rounded-xl bg-[var(--bg-surface)] border border-purple-500/30 bg-purple-500/5">
+                      <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 block">
+                        {isArabic ? 'النقاط المستهلكة' : 'Points Used'}
+                      </span>
+                      <p className="text-base sm:text-lg font-black text-purple-600 dark:text-purple-400 mt-1 font-mono">
+                        {(statusData.stats?.pointsUsed ?? Math.floor((statusData.stats?.tokensUsed || 0) / 5)).toLocaleString()}
+                      </p>
+                    </div>
+
+                    {/* 3. Messages Count */}
+                    <div className="p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)]">
+                      <span className="text-[10px] font-bold text-[var(--text-muted)] block">
+                        {isArabic ? 'عدد الرسائل' : 'Messages'}
+                      </span>
+                      <p className="text-base sm:text-lg font-black text-[var(--text-main)] mt-1 font-mono">
+                        {statusData.stats?.messagesCount ?? (statusData.usage?.ai_messages || 0)}
+                        <span className="text-[10px] text-[var(--text-muted)] font-normal">
+                          {' '}/ {statusData.plan?.limits?.ai_messages_per_month ?? 50}
+                        </span>
+                      </p>
+                    </div>
+
+                    {/* 4. Voice Minutes / Seconds */}
+                    <div className="p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)]">
+                      <span className="text-[10px] font-bold text-[var(--text-muted)] block">
+                        {isArabic ? 'دقائق الصوت' : 'Voice Minutes'}
+                      </span>
+                      <p className="text-base sm:text-lg font-black text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
+                        {statusData.stats?.voiceMinutes ?? (statusData.usage?.voice_minutes || 0)}
+                        <span className="text-[10px] text-[var(--text-muted)] font-normal">
+                          {' '}/ {statusData.plan?.limits?.voice_minutes_per_month ?? 15}د
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 

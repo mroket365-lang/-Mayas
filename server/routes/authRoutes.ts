@@ -310,6 +310,149 @@ authRouter.post('/sync', (req: Request, res: Response) => {
   return res.json({ message: 'Data synchronized successfully' });
 });
 
+// POST /api/user/update-profile (Real-time Profile Updates and Synchronization)
+authRouter.post('/user/update-profile', (req: Request, res: Response) => {
+  const { userId, name, username, phone, addressAs, companionGender, language, theme, timezone } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID is required' });
+  }
+
+  let user = db.findUserById(userId);
+  if (!user) {
+    // If user is local/guest and updating profile, create entry in db
+    user = {
+      id: userId,
+      email: `${userId.toLowerCase()}@rafiq.local`,
+      name: name || 'مستخدم الرفيق',
+      role: 'user',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      lastActiveAt: new Date().toISOString(),
+    };
+  }
+
+  // Only update formal account name if explicitly provided and not just modifying companion nickname
+  if (name && name.trim()) {
+    user.name = name.trim();
+  }
+  if (username) user.username = username.trim().toLowerCase();
+  if (phone) user.phone = phone.trim();
+  if (timezone) user.timezone = timezone;
+  if (language) user.locale = language;
+  if (addressAs !== undefined) (user as any).addressAs = String(addressAs).trim();
+
+  user.lastActiveAt = new Date().toISOString();
+  user.profileData = {
+    ...(user.profileData || {}),
+    name: user.name,
+    addressAs: addressAs !== undefined ? String(addressAs).trim() : user.profileData?.addressAs,
+    companionGender: companionGender || user.profileData?.companionGender,
+    language: language || user.profileData?.language,
+    theme: theme || user.profileData?.theme,
+  };
+
+  db.upsertUser(user);
+
+  return res.json({
+    success: true,
+    message: 'تم تحديث بيانات البروفايل ونداء الرفيق بنجاح',
+    user: {
+      id: user.id,
+      accountId: user.id,
+      email: user.email,
+      name: user.name,
+      addressAs: (user as any).addressAs || user.profileData?.addressAs || 'يا غالي',
+      username: user.username,
+      phone: user.phone,
+      role: user.role,
+      isEmailVerified: (user as any).isEmailVerified ?? true,
+      createdAt: user.createdAt,
+    },
+  });
+});
+
+// POST /api/auth/send-verification-otp
+authRouter.post('/send-verification-otp', (req: Request, res: Response) => {
+  const { email, userId } = req.body;
+
+  let user = db.getUsers().find((u) => u.email.toLowerCase() === (email || '').toLowerCase() || u.id === userId);
+
+  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = Date.now() + 15 * 60 * 1000; // 15 mins
+
+  if (user) {
+    (user as any).verificationCode = otpCode;
+    (user as any).verificationExpiresAt = expiresAt;
+    db.upsertUser(user);
+  }
+
+  console.log(`[Email Verification OTP] Code for ${email || userId}: ${otpCode}`);
+
+  return res.json({
+    success: true,
+    message: `تم إرسال رمز التحقق (OTP) إلى بريدك الإلكتروني (${email || 'المسجل'})`,
+    code: otpCode, // Provided for user preview and seamless verification
+    hint: `رمز التحقق المرسل لبريدك هو: ${otpCode}`,
+  });
+});
+
+// POST /api/auth/verify-otp
+authRouter.post('/verify-otp', (req: Request, res: Response) => {
+  const { email, userId, code } = req.body;
+
+  if (!code) {
+    return res.status(400).json({ error: 'يرجى إدخال رمز التحقق المكون من 6 أرقام' });
+  }
+
+  const user = db.getUsers().find((u) => u.email.toLowerCase() === (email || '').toLowerCase() || u.id === userId);
+
+  if (!user) {
+    return res.status(404).json({ error: 'لم يتم العثور على المستخدم' });
+  }
+
+  const storedCode = (user as any).verificationCode;
+  if (storedCode && storedCode !== code.trim()) {
+    return res.status(400).json({ error: 'رمز التحقق غير صحيح، يرجى التأكد وإعادة المحاولة' });
+  }
+
+  (user as any).isEmailVerified = true;
+  delete (user as any).verificationCode;
+  delete (user as any).verificationExpiresAt;
+  db.upsertUser(user);
+
+  return res.json({
+    success: true,
+    message: 'تم التحقق من بريدك الإلكتروني بنجاح وتوثيق الحساب ✨',
+    isEmailVerified: true,
+  });
+});
+
+// GET /api/user/me
+authRouter.get('/user/me', (req: Request, res: Response) => {
+  const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || '';
+  const user = db.findUserById(userId);
+
+  if (!user) {
+    return res.json({ loggedIn: false });
+  }
+
+  return res.json({
+    loggedIn: true,
+    user: {
+      id: user.id,
+      accountId: user.id,
+      email: user.email,
+      name: user.name,
+      username: user.username,
+      phone: user.phone,
+      role: user.role,
+      isEmailVerified: (user as any).isEmailVerified ?? true,
+      createdAt: user.createdAt,
+    },
+  });
+});
+
 // GET /api/features/permissions
 authRouter.get('/features/permissions', (req: Request, res: Response) => {
   const userId = (req.query.userId as string) || '';

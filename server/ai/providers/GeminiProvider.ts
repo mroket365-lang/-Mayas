@@ -54,6 +54,11 @@ export const geminiToolDeclarations: FunctionDeclaration[] = [
           type: Type.STRING,
           description: 'Repetition rule: none, daily, weekly, or monthly.',
         },
+        subtasks: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: 'Optional array of subtask titles or decomposed steps for complex tasks (e.g., ["كتابة النص", "التصوير", "المونتاج"]).',
+        },
       },
       required: ['type', 'title'],
     },

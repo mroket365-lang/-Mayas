@@ -12,10 +12,12 @@ import {
   Flame,
   HeartHandshake,
   SlidersHorizontal,
+  BarChart3,
   X,
 } from 'lucide-react';
 import { UserProfile, AppLanguage } from '../types';
 import { getTranslation, supportedLanguages } from '../locales/translations';
+import { SystemPublicSettings } from '../App';
 
 interface HeaderProps {
   profile: UserProfile;
@@ -24,6 +26,8 @@ interface HeaderProps {
   onOpenPermissions: () => void;
   onOpenSubscription?: () => void;
   onOpenMaritalSupport?: () => void;
+  onOpenStats?: () => void;
+  systemSettings?: SystemPublicSettings | null;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -33,6 +37,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenPermissions,
   onOpenSubscription,
   onOpenMaritalSupport,
+  onOpenStats,
+  systemSettings,
 }) => {
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
   const toolsMenuRef = useRef<HTMLDivElement>(null);
@@ -94,6 +100,18 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Crown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-100 animate-pulse shrink-0" />
             <span className="whitespace-nowrap">{isArabic ? 'ترقية ✨' : 'Upgrade ✨'}</span>
+          </button>
+        )}
+
+        {/* 1.5. Stats Modal Quick Trigger */}
+        {onOpenStats && (
+          <button
+            onClick={onOpenStats}
+            className="p-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--accent-sage)] transition-all flex items-center gap-1 font-bold text-xs"
+            title={isArabic ? 'إحصائيات الاستهلاك والإنجاز' : 'Usage & Stats'}
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span className="hidden md:inline">{isArabic ? 'الإحصائيات' : 'Stats'}</span>
           </button>
         )}
 
@@ -190,27 +208,29 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
 
               {/* Private Candid Conversations Toggle */}
-              <button
-                onClick={() => {
-                  onUpdateProfile({
-                    ...profile,
-                    privateCandidMode: !(profile.privateCandidMode || profile.personality === 'bold'),
-                  });
-                }}
-                className={`w-full p-2.5 rounded-xl border text-xs font-bold flex items-center justify-between transition-all ${
-                  profile.privateCandidMode || profile.personality === 'bold'
-                    ? 'bg-gradient-to-r from-amber-500/15 to-orange-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400 font-extrabold'
-                    : 'border-[var(--border-color)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--text-main)]'
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <Flame className="w-4 h-4 text-amber-500 animate-pulse shrink-0" />
-                  <span>{isArabic ? 'نمط الحوارات الخاصة' : 'Private Candid Mode'}</span>
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600">
-                  {profile.privateCandidMode ? (isArabic ? 'مُفعّل' : 'ON') : (isArabic ? 'مُعطّل' : 'OFF')}
-                </span>
-              </button>
+              {systemSettings?.privateCandidAllowed !== false && (
+                <button
+                  onClick={() => {
+                    onUpdateProfile({
+                      ...profile,
+                      privateCandidMode: !(profile.privateCandidMode || profile.personality === 'bold'),
+                    });
+                  }}
+                  className={`w-full p-2.5 rounded-xl border text-xs font-bold flex items-center justify-between transition-all ${
+                    profile.privateCandidMode || profile.personality === 'bold'
+                      ? 'bg-gradient-to-r from-amber-500/15 to-orange-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400 font-extrabold'
+                      : 'border-[var(--border-color)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--text-main)]'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Flame className="w-4 h-4 text-amber-500 animate-pulse shrink-0" />
+                    <span>{isArabic ? 'نمط الحوارات الخاصة' : 'Private Candid Mode'}</span>
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600">
+                    {profile.privateCandidMode ? (isArabic ? 'مُفعّل' : 'ON') : (isArabic ? 'مُعطّل' : 'OFF')}
+                  </span>
+                </button>
+              )}
 
               {/* Marital Support Session */}
               {onOpenMaritalSupport && (

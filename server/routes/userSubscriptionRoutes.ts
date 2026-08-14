@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { db } from '../db/database.js';
 import { SubscriptionService } from '../services/subscriptionService.js';
 import { PaymentGatewayManager } from '../services/payment/PaymentProvider.js';
+import { realtimeSyncService } from '../services/realtimeSyncService.js';
 
 export const userSubscriptionRouter = Router();
 
@@ -24,6 +25,8 @@ const handleGetSubscription = (req: Request, res: Response) => {
   usageRecords.forEach((r) => {
     usageMap[r.feature] = r.count;
   });
+
+  const stats = SubscriptionService.getUserFullStats(userId);
 
   return res.json({
     user: {
@@ -52,12 +55,47 @@ const handleGetSubscription = (req: Request, res: Response) => {
     },
     period,
     usage: usageMap,
+    stats, // Comprehensive stats: tokens, points (1 pt = 5 tokens), messages, voice
   });
 };
 
 userSubscriptionRouter.get('/subscription', handleGetSubscription);
 userSubscriptionRouter.get('/subscription/status', handleGetSubscription);
 userSubscriptionRouter.get('/user/subscription', handleGetSubscription);
+
+// GET /api/user/usage-stats (Dedicated Real-time Stats)
+userSubscriptionRouter.get('/usage-stats', (req: Request, res: Response) => {
+  const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || 'user_default_01';
+  const stats = SubscriptionService.getUserFullStats(userId);
+  const { plan } = SubscriptionService.getUserSubscription(userId);
+  return res.json({
+    success: true,
+    userId,
+    stats,
+    plan: {
+      id: plan.id,
+      name: plan.name,
+      limits: plan.limits,
+    },
+  });
+});
+
+// POST /api/user/record-voice-usage
+userSubscriptionRouter.post('/record-voice-usage', (req: Request, res: Response) => {
+  const userId = req.body.userId || (req.headers['x-user-id'] as string) || 'user_default_01';
+  const durationSeconds = Number(req.body.seconds) || 5;
+
+  // Record voice seconds in usage records
+  SubscriptionService.recordUsage(userId, 'voice_seconds', durationSeconds);
+  const minutes = Math.ceil(durationSeconds / 60);
+  SubscriptionService.recordUsage(userId, 'voice_minutes', minutes);
+
+  // Broadcast realtime sync
+  realtimeSyncService.broadcast('subscription_updated', { userId, feature: 'voice_seconds', amount: durationSeconds });
+
+  const stats = SubscriptionService.getUserFullStats(userId);
+  return res.json({ success: true, stats });
+});
 
 // GET /api/user/plans or /api/subscription/plans or /api/plans
 const handleGetPlans = (req: Request, res: Response) => {
@@ -94,6 +132,8 @@ userSubscriptionRouter.post('/checkout', async (req: Request, res: Response) => 
     billingCycle,
     currency: 'USD',
   });
+
+  realtimeSyncService.broadcast('subscription_updated', { userId, planId, result });
 
   return res.json(result);
 });

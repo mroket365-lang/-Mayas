@@ -118,6 +118,15 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ token }) => {
       if (!res.ok) throw new Error(data.error || 'Action failed');
 
       setActionMessage(data.message || 'تم تنفيذ العملية بنجاح');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('subscription_updated'));
+        window.dispatchEvent(new CustomEvent('system_settings_updated'));
+        try {
+          const bc = new BroadcastChannel('rafiq_settings_sync');
+          bc.postMessage('updated');
+          bc.close();
+        } catch (e) {}
+      }
       setActionType(null);
       fetchUsers();
       if (selectedUser) openUserDetails(selectedUser);
@@ -303,7 +312,19 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ token }) => {
                   <span>إدارة حساب المستخدم</span>
                   <span className="text-xs font-mono text-slate-400">({selectedUser.id})</span>
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">{selectedUser.name} &bull; {selectedUser.email}</p>
+                <p className="text-xs text-slate-400 mt-0.5 flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-slate-200">{selectedUser.name}</span>
+                  <span>&bull;</span>
+                  <span>{selectedUser.email}</span>
+                  {(userDetails?.user?.addressAs || userDetails?.user?.profileData?.addressAs) && (
+                    <>
+                      <span>&bull;</span>
+                      <span className="text-amber-400 bg-amber-950/60 border border-amber-800/60 px-2 py-0.5 rounded-md text-[11px]">
+                        نداء الرفيق: "{userDetails?.user?.addressAs || userDetails?.user?.profileData?.addressAs}"
+                      </span>
+                    </>
+                  )}
+                </p>
               </div>
               <button
                 onClick={() => {
@@ -344,20 +365,57 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ token }) => {
                   </div>
                 </div>
 
-                {/* Monthly Usage Counters */}
-                <div className="bg-slate-950 p-4 border border-slate-800 rounded-xl space-y-2">
-                  <h4 className="font-semibold text-white text-sm text-purple-400">
-                    استخدام الشهر الحالي ({userDetails.usagePeriod})
-                  </h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                {/* Monthly Usage Counters & Token/Point Stats */}
+                <div className="bg-slate-950 p-4 border border-slate-800 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold text-white text-sm text-purple-400">
+                      استهلاك الموارد والنقاط ({userDetails.usagePeriod})
+                    </h4>
+                    <span className="text-[10px] font-mono text-purple-300 bg-purple-950/80 border border-purple-800 px-2 py-0.5 rounded-full">
+                      1 نقطة = 5 توكن
+                    </span>
+                  </div>
+
+                  {/* High level token and point metrics */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                    <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg">
+                      <p className="text-[10px] text-slate-400">التوكنات المستخدمة</p>
+                      <p className="text-base font-bold text-indigo-400 mt-0.5 font-mono">
+                        {(userDetails.stats?.tokensUsed ?? 0).toLocaleString()}
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 bg-purple-950/30 border border-purple-800/40 rounded-lg">
+                      <p className="text-[10px] text-purple-300">النقاط المستهلكة</p>
+                      <p className="text-base font-bold text-purple-400 mt-0.5 font-mono">
+                        {(userDetails.stats?.pointsUsed ?? Math.floor((userDetails.stats?.tokensUsed || 0) / 5)).toLocaleString()}
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg">
+                      <p className="text-[10px] text-slate-400">عدد الرسائل</p>
+                      <p className="text-base font-bold text-white mt-0.5 font-mono">
+                        {userDetails.stats?.messagesCount ?? 0} / {userDetails.plan?.limits?.ai_messages_per_month ?? 50}
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg">
+                      <p className="text-[10px] text-slate-400">دقائق الصوت</p>
+                      <p className="text-base font-bold text-emerald-400 mt-0.5 font-mono">
+                        {userDetails.stats?.voiceMinutes ?? 0} / {userDetails.plan?.limits?.voice_minutes_per_month ?? 15}د
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center pt-2 border-t border-slate-800">
                     {Object.entries(userDetails.plan?.limits || {}).map(([key, limitVal]: [string, any]) => {
                       const featKey = key.replace('_per_month', '');
                       const rec = userDetails.usageRecords?.find((r: any) => r.feature === featKey);
                       const used = rec ? rec.count : 0;
                       return (
-                        <div key={key} className="p-2 bg-slate-900 border border-slate-800 rounded-lg">
+                        <div key={key} className="p-2 bg-slate-900/60 border border-slate-800/60 rounded-lg">
                           <p className="text-[10px] text-slate-400">{featKey}</p>
-                          <p className="text-sm font-bold text-white mt-0.5">
+                          <p className="text-xs font-bold text-slate-200 mt-0.5">
                             {used} / {limitVal}
                           </p>
                         </div>

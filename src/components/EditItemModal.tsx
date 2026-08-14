@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { CompanionItem, ItemType, UserProfile } from '../types';
-import { X, Calendar, Clock, Type, Tag, Bell, Check, Edit3 } from 'lucide-react';
+import { CompanionItem, ItemType, SubTask, UserProfile } from '../types';
+import { X, Calendar, Clock, Type, Tag, Bell, Check, Edit3, ListCheck, Plus, Trash2, Sparkles, Loader2 } from 'lucide-react';
 import { getTranslation } from '../locales/translations';
 
 type PriorityLevel = NonNullable<CompanionItem['priority']>;
@@ -32,11 +32,68 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
   const [dueDate, setDueDate] = useState(item.dueDate || new Date().toISOString().split('T')[0]);
   const [dueTime, setDueTime] = useState(item.dueTime || '09:00');
   const [priority, setPriority] = useState<PriorityLevel>(item.priority || 'medium');
-  const [repeatRule, setRepeatRule] = useState<RepeatRule>(item.repeatRule || 'none');
+  const [repeatRule, setRepeatRule] = useState<RepeatRule>(item.repeatRule || (item.type === 'habit' ? 'daily' : 'none'));
+  const [icon, setIcon] = useState(item.icon || '🔥');
+  const [subtasks, setSubtasks] = useState<SubTask[]>(item.subtasks || []);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [isDecomposing, setIsDecomposing] = useState(false);
+
+  const habitIcons = ['🔥', '🧘', '💧', '📖', '🏃', '☕', '💊', '🚴', '🧠', '☀️', '🏋️', '🎯', '🥗', '😴'];
+
+  const handleAddSubtask = () => {
+    if (!newSubtaskTitle.trim()) return;
+    const newSt: SubTask = {
+      id: 'st_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5),
+      title: newSubtaskTitle.trim(),
+      completed: false,
+    };
+    setSubtasks([...subtasks, newSt]);
+    setNewSubtaskTitle('');
+  };
+
+  const handleDeleteSubtask = (stId: string) => {
+    setSubtasks(subtasks.filter((st) => st.id !== stId));
+  };
+
+  const handleAIDecomposeInModal = async () => {
+    if (!title.trim()) return;
+    try {
+      setIsDecomposing(true);
+      const res = await fetch('/api/companion/decompose-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          description,
+          language: profile.language,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Decompose failed');
+
+      const data = await res.json();
+      if (data.subtaskTitles && Array.isArray(data.subtaskTitles)) {
+        const generatedSubtasks: SubTask[] = data.subtaskTitles.map((stTitle: string, idx: number) => ({
+          id: 'st_ai_' + Date.now() + '_' + idx,
+          title: stTitle,
+          completed: false,
+        }));
+        setSubtasks([...subtasks, ...generatedSubtasks]);
+      }
+    } catch (err) {
+      console.error('Failed to decompose task in modal:', err);
+    } finally {
+      setIsDecomposing(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
+
+    const completedSubtasks = subtasks.filter((st) => st.completed).length;
+    const progressPercent =
+      subtasks.length > 0 ? Math.round((completedSubtasks / subtasks.length) * 100) : item.progressPercent || 0;
 
     const updatedItem: CompanionItem = {
       ...item,
@@ -46,7 +103,10 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
       dueDate,
       dueTime,
       priority,
-      repeatRule,
+      repeatRule: type === 'habit' && repeatRule === 'none' ? 'daily' : repeatRule,
+      icon,
+      subtasks: subtasks.length > 0 ? subtasks : undefined,
+      progressPercent,
       updatedAt: new Date().toISOString(),
     };
 
@@ -118,6 +178,31 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
               <option value="memory">{t.filterMemories}</option>
             </select>
           </div>
+
+          {/* Habit Icon Picker */}
+          {type === 'habit' && (
+            <div>
+              <label className="block font-extrabold text-[var(--text-muted)] mb-1">
+                {isArabic ? 'أيقونة العادة / الروتين' : 'Habit Icon'}
+              </label>
+              <div className="flex flex-wrap gap-2 p-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)]">
+                {habitIcons.map((ic) => (
+                  <button
+                    key={ic}
+                    type="button"
+                    onClick={() => setIcon(ic)}
+                    className={`w-9 h-9 rounded-xl text-lg flex items-center justify-center transition-all ${
+                      icon === ic
+                        ? 'bg-[var(--accent-sage)] text-white shadow-md scale-110'
+                        : 'hover:bg-[var(--bg-hover)]'
+                    }`}
+                  >
+                    {ic}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Date & Time */}
           <div className="grid grid-cols-2 gap-3">
@@ -193,6 +278,68 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                 <option value="weekly">{isArabic ? 'أسبوعي' : 'Weekly'}</option>
                 <option value="monthly">{isArabic ? 'شهري' : 'Monthly'}</option>
               </select>
+            </div>
+          </div>
+
+          {/* Subtasks Section */}
+          <div className="p-3.5 rounded-2xl bg-[var(--bg-main)] border border-[var(--border-color)] space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="font-extrabold text-[var(--text-main)] flex items-center gap-1.5">
+                <ListCheck className="w-4 h-4 text-[var(--accent-sage)]" />
+                <span>{isArabic ? 'أجزاء وخطوات المهمة الفرعية' : 'Subtasks Breakdown'}</span>
+              </label>
+
+              <button
+                type="button"
+                onClick={handleAIDecomposeInModal}
+                disabled={isDecomposing || !title.trim()}
+                className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 text-amber-700 dark:text-amber-400 text-[11px] font-black border border-amber-500/20 flex items-center gap-1 transition-all"
+              >
+                {isDecomposing ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                )}
+                <span>{isDecomposing ? (isArabic ? 'جاري التفكيك...' : 'Decomposing...') : (isArabic ? 'تفكيك بالذكاء الاصطناعي 🪄' : 'AI Decompose')}</span>
+              </button>
+            </div>
+
+            {subtasks.length > 0 && (
+              <div className="space-y-1.5">
+                {subtasks.map((st) => (
+                  <div
+                    key={st.id}
+                    className="flex items-center justify-between p-2 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs font-semibold"
+                  >
+                    <span className="truncate text-[var(--text-main)]">{st.title}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteSubtask(st.id)}
+                      className="p-1 rounded text-rose-500 hover:bg-rose-500/10 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="text"
+                value={newSubtaskTitle}
+                onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                placeholder={isArabic ? 'أضف خطوة/جزء فرعي...' : 'Add subtask step...'}
+                className="flex-1 px-3 py-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-main)] text-xs font-semibold focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleAddSubtask}
+                disabled={!newSubtaskTitle.trim()}
+                className="px-3 py-2 rounded-xl bg-[var(--accent-sage)] text-white hover:opacity-90 font-bold text-xs disabled:opacity-40"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
             </div>
           </div>
 

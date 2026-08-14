@@ -26,6 +26,7 @@ export const translations = {
     navCompanion: 'الرفيق',
     navSaved: 'المحفوظات',
     navToday: 'يومي',
+    navProfile: 'البروفايل',
     settings: 'الإعدادات',
     
     // Onboarding
@@ -152,6 +153,7 @@ export const translations = {
     navCompanion: 'Companion',
     navSaved: 'Saved',
     navToday: 'Today',
+    navProfile: 'Profile',
     settings: 'Settings',
     
     // Onboarding

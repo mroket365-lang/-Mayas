@@ -2,11 +2,12 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
-import { processCompanionChat, processCompanionChatStream, generateDailyReview } from './server/geminiService.js';
+import { processCompanionChat, processCompanionChatStream, generateDailyReview, decomposeTaskWithAI } from './server/geminiService.js';
 import { adminRouter } from './server/routes/adminRoutes.js';
 import { userSubscriptionRouter } from './server/routes/userSubscriptionRoutes.js';
 import { authRouter } from './server/routes/authRoutes.js';
 import { db, FeatureFlagConfig } from './server/db/database.js';
+import { realtimeSyncService } from './server/services/realtimeSyncService.js';
 
 dotenv.config();
 
@@ -25,6 +26,38 @@ async function startServer() {
     res.setHeader('Surrogate-Control', 'no-store');
     next();
   });
+
+  // Real-Time Server-Sent Events (SSE) stream for instant (< 50ms) admin variable synchronization
+  const handleRealtimeStream = (req: express.Request, res: express.Response) => {
+    const userId = (req.query.userId as string) || '';
+    const email = (req.query.email as string) || '';
+    const country = (req.query.country as string) || '';
+    const clientId = 'client_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    const client = {
+      id: clientId,
+      res,
+      userId,
+      email,
+      country,
+      connectedAt: Date.now(),
+    };
+
+    realtimeSyncService.addClient(client);
+
+    req.on('close', () => {
+      realtimeSyncService.removeClient(clientId);
+    });
+  };
+
+  app.get('/api/realtime/events', handleRealtimeStream);
+  app.get('/api/public/realtime-events', handleRealtimeStream);
 
   // Public Real-Time System Settings & Feature Flags API Endpoint
   app.get('/api/public/settings', (req, res) => {
@@ -166,6 +199,21 @@ async function startServer() {
     } catch (error: unknown) {
       console.error('Review endpoint error:', error);
       const errMessage = error instanceof Error ? error.message : 'Failed to generate review';
+      return res.status(500).json({ error: errMessage });
+    }
+  });
+
+  app.post('/api/companion/decompose-task', async (req, res) => {
+    try {
+      const { title, description, language } = req.body;
+      if (!title) {
+        return res.status(400).json({ error: 'Task title is required' });
+      }
+      const subtaskTitles = await decomposeTaskWithAI(title, description, language || 'ar');
+      return res.json({ subtaskTitles });
+    } catch (error: unknown) {
+      console.error('Decompose task endpoint error:', error);
+      const errMessage = error instanceof Error ? error.message : 'Failed to decompose task';
       return res.status(500).json({ error: errMessage });
     }
   });
