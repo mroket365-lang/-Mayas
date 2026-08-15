@@ -188,7 +188,13 @@ export class GeminiProvider extends AIProvider {
         } catch (err: any) {
           lastError = err;
           const errStr = String(err?.message || err);
-          const isTransient = errStr.includes('503') || errStr.includes('UNAVAILABLE') || errStr.includes('429') || errStr.includes('RESOURCE_EXHAUSTED') || errStr.includes('500');
+          const is429 = errStr.includes('429') || errStr.includes('RESOURCE_EXHAUSTED') || errStr.includes('quota');
+          const isTransient = errStr.includes('503') || errStr.includes('UNAVAILABLE') || errStr.includes('500');
+
+          // If 429, don't wait on the same model, switch directly to next fallback model
+          if (is429) {
+            break;
+          }
 
           if (attempt === 0 && isTransient) {
             await new Promise((resolve) => setTimeout(resolve, 300));
@@ -251,7 +257,13 @@ export class GeminiProvider extends AIProvider {
         } catch (err: any) {
           lastError = err;
           const errStr = String(err?.message || err);
-          const isTransient = errStr.includes('503') || errStr.includes('UNAVAILABLE') || errStr.includes('429') || errStr.includes('RESOURCE_EXHAUSTED') || errStr.includes('500');
+          const is429 = errStr.includes('429') || errStr.includes('RESOURCE_EXHAUSTED') || errStr.includes('quota');
+          const isTransient = errStr.includes('503') || errStr.includes('UNAVAILABLE') || errStr.includes('500');
+
+          // If 429 quota exhaustion, advance directly to next fallback model
+          if (is429) {
+            break;
+          }
 
           if (attempt === 0 && isTransient) {
             await new Promise((resolve) => setTimeout(resolve, 300));

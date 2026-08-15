@@ -23,11 +23,15 @@ function generateSmartFallbackReply(
   const createdOrUpdatedItems: CompanionItem[] = [];
   const actions: ActionSummary[] = [];
 
+  const tempNotice = isArabic
+    ? `\n\n⚠️ *(تنبيه لطيف: نواجه حالياً ضغطاً مؤقتاً في خوادم الذكاء الاصطناعي السحابية، ويعمل النظام تلقائياً على استعادة الاستجابة الكاملة في أقرب وقت. تم تفعيل الرد الاحتياطي لتنظيم مهامك ومواعيدك مؤقتاً).*`
+    : `\n\n⚠️ *(Notice: Cloud AI is currently experiencing high temporary load and will recover shortly. Safe backup mode is active).*`;
+
   // Greetings
   if (/^(مرحبا|أهلا|اهلا|هلا|السلام عليكم|سلام|صباح الخير|مساء الخير|هاي|hello|hi|hey)/i.test(cleanMsg)) {
-    const replyText = isArabic
+    const replyText = (isArabic
       ? `أهلاً وسهلاً بك ${addressAs} ❤️ أنا معك ومستعد لمساعدتك في تنظيم يومك ومواعيدك ومهامك. كيف أقدر أخدمك اليوم؟ ✨`
-      : `Hello ${addressAs}! I am here with you, ready to help you manage your day and tasks. How can I assist you today? ✨`;
+      : `Hello ${addressAs}! I am here with you, ready to help you manage your day and tasks. How can I assist you today? ✨`) + tempNotice;
     return { replyText, createdOrUpdatedItems, actions };
   }
 
@@ -39,13 +43,13 @@ function generateSmartFallbackReply(
 
     if (isArabic) {
       if (todayItems.length === 0) {
-        replyText = `جدولك اليوم هادئ ومرتب ${addressAs}، ما عندك أي مهام مسجلة لليوم. تحب نضيف أي مهمة أو تذكير جديد؟ ✨`;
+        replyText = `جدولك اليوم هادئ ومرتب ${addressAs}، ما عندك أي مهام مسجلة لليوم. تحب نضيف أي مهمة أو تذكير جديد؟ ✨` + tempNotice;
       } else {
         const itemTitles = todayItems.slice(0, 5).map((i) => `• ${i.title} (${i.status === 'completed' ? 'منجز' : 'قيد الانتظار'})`).join('\n');
-        replyText = `إليك نظرة سريعة على جدولك اليوم ${addressAs} (لديك ${pendingCount} مهام متبقية):\n${itemTitles}\n\nأنا معك دائماً للمساعدة في إنجازها خطوة بخطوة! 💪`;
+        replyText = `إليك نظرة سريعة على جدولك اليوم ${addressAs} (لديك ${pendingCount} مهام متبقية):\n${itemTitles}\n\nأنا معك دائماً للمساعدة في إنجازها خطوة بخطوة! 💪` + tempNotice;
       }
     } else {
-      replyText = `You have ${pendingCount} pending items for today, ${addressAs}. Let me know if you need to adjust or add anything!`;
+      replyText = `You have ${pendingCount} pending items for today, ${addressAs}. Let me know if you need to adjust or add anything!` + tempNotice;
     }
     return { replyText, createdOrUpdatedItems, actions };
   }
@@ -78,17 +82,17 @@ function generateSmartFallbackReply(
       itemId: newItem.id,
     });
 
-    const replyText = isArabic
+    const replyText = (isArabic
       ? `أبشر ${addressAs}! تم تسجيل ${isAppointment ? 'الموعد' : 'المهمة'} "${newItem.title}" بنجاح في جدولك لليوم ❤️`
-      : `Done, ${addressAs}! I added "${newItem.title}" to your schedule for today ❤️`;
+      : `Done, ${addressAs}! I added "${newItem.title}" to your schedule for today ❤️`) + tempNotice;
 
     return { replyText, createdOrUpdatedItems, actions };
   }
 
   // General warm companion fallback
   const replyText = isArabic
-    ? `أنا معك وأسمعك بكل اهتمام ${addressAs} ❤️ تواصل معي بأي وقت وسأساعدك في تنظيم أفكارك ومواعيدك ومهامك بكل سرور ✨`
-    : `I am right here with you, ${addressAs}! Let me know whenever you need help organizing your tasks or reminders.`;
+    ? `أنا معك وأسمعك بكل اهتمام ${addressAs} ❤️\n\n⚠️ *(تنبيه لطيف: نواجه حالياً ضغطاً أو انقطاعاً مؤقتاً في الاتصال السحابي بالذكاء الاصطناعي، ويعمل النظام تلقائياً على استعادة الاستجابة الكاملة في أقرب وقت. تم تفعيل وضع الطوارئ الذكي لخدمتك ومساعدتك في مهامك ومواعيدك دون توقف).* ✨`
+    : `I am right here with you, ${addressAs}! ❤️\n\n⚠️ *(Notice: Cloud AI is currently experiencing high temporary load. Full intelligence will be restored shortly. In the meantime, local task and schedule assistance is active).* ✨`;
 
   return { replyText, createdOrUpdatedItems, actions };
 }
@@ -180,9 +184,35 @@ export async function processOrchestratedChatStream(
       currentDateStr
     );
 
-    const finalReplyText =
-      response.text.trim() ||
-      (isArabic ? 'تم يا غالي ❤️ أسمعك بكل اهتمام' : 'Done! I am right here listening.');
+    let finalReplyText = response.text.trim();
+    if (!finalReplyText) {
+      const addressAs = profile.addressAs || (isArabic ? 'يا غالي' : 'friend');
+      if (actions.length > 0) {
+        const createdOnes = actions.filter((a) => a.type === 'created');
+        const completedOnes = actions.filter((a) => a.type === 'completed');
+
+        if (createdOnes.length > 0) {
+          const names = createdOnes.map((c) => `"${c.title}"`).join(' و ');
+          finalReplyText = isArabic
+            ? `أبشر ${addressAs}! تم تسجيل ${names} بنجاح في جدولك لليوم ✨`
+            : `Done ${addressAs}! I added ${names} to your schedule ✨`;
+        } else if (completedOnes.length > 0) {
+          const names = completedOnes.map((c) => `"${c.title}"`).join(' و ');
+          finalReplyText = isArabic
+            ? `أحسنت ${addressAs}! تم تحديث وإنجاز ${names} بنجاح 💪✨`
+            : `Great job ${addressAs}! Marked ${names} as completed ✨`;
+        } else {
+          finalReplyText = isArabic
+            ? `تم تحديث جدولك وبياناتك بنجاح ${addressAs} ❤️`
+            : `Updated your schedule and details successfully ${addressAs} ❤️`;
+        }
+      } else {
+        finalReplyText = isArabic
+          ? `أنا معك وأسمعك بكل اهتمام ${addressAs} ❤️ كيف أقدر أساعدك؟`
+          : `I am right here with you ${addressAs}! How can I help?`;
+      }
+      onChunk(finalReplyText);
+    }
 
     return {
       replyText: finalReplyText,
