@@ -63,8 +63,8 @@ userSubscriptionRouter.get('/subscription', handleGetSubscription);
 userSubscriptionRouter.get('/subscription/status', handleGetSubscription);
 userSubscriptionRouter.get('/user/subscription', handleGetSubscription);
 
-// GET /api/user/usage-stats (Dedicated Real-time Stats)
-userSubscriptionRouter.get('/usage-stats', (req: Request, res: Response) => {
+// GET /api/user/usage-stats or /api/usage-stats (Dedicated Real-time Stats)
+const handleUsageStats = (req: Request, res: Response) => {
   const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || 'user_default_01';
   const stats = SubscriptionService.getUserFullStats(userId);
   const { plan } = SubscriptionService.getUserSubscription(userId);
@@ -78,7 +78,11 @@ userSubscriptionRouter.get('/usage-stats', (req: Request, res: Response) => {
       limits: plan.limits,
     },
   });
-});
+};
+
+userSubscriptionRouter.get('/usage-stats', handleUsageStats);
+userSubscriptionRouter.get('/user/usage-stats', handleUsageStats);
+userSubscriptionRouter.get('/subscription/usage-stats', handleUsageStats);
 
 // POST /api/user/record-voice-usage
 userSubscriptionRouter.post('/record-voice-usage', (req: Request, res: Response) => {

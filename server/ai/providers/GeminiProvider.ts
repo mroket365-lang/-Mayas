@@ -149,14 +149,14 @@ export const geminiToolDeclarations: FunctionDeclaration[] = [
 
 export class GeminiProvider extends AIProvider {
   readonly name = 'gemini';
-  readonly defaultModel = 'gemini-3.6-flash';
+  readonly defaultModel = 'gemini-2.5-flash';
 
   isAvailable(): boolean {
     return !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0;
   }
 
   async generateResponse(params: AIProviderParams): Promise<ProviderResponse> {
-    const modelsToTry = [this.defaultModel, 'gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+    const modelsToTry = [this.defaultModel, 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest'];
     let lastError: unknown = null;
 
     for (const modelName of Array.from(new Set(modelsToTry))) {
@@ -211,7 +211,7 @@ export class GeminiProvider extends AIProvider {
     params: AIProviderParams,
     onChunk: (text: string) => void
   ): Promise<ProviderResponse> {
-    const modelsToTry = [this.defaultModel, 'gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+    const modelsToTry = [this.defaultModel, 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest'];
     let lastError: unknown = null;
 
     for (const modelName of Array.from(new Set(modelsToTry))) {

@@ -116,6 +116,9 @@ async function startServer() {
 
   // API Routes FIRST
   app.use('/api/admin', adminRouter);
+  app.use('/api/auth', authRouter);
+  app.use('/api/user', userSubscriptionRouter);
+  app.use('/api/subscription', userSubscriptionRouter);
   app.use('/api', userSubscriptionRouter);
   app.use('/api', authRouter);
 

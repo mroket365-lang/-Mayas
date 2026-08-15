@@ -95,8 +95,8 @@ const handleRegister = async (req: Request, res: Response) => {
 authRouter.post('/register', handleRegister);
 authRouter.post('/auth/register', handleRegister);
 
-// POST /api/auth/login
-authRouter.post('/login', (req: Request, res: Response) => {
+// POST /api/auth/login or /api/login
+const handleLogin = (req: Request, res: Response) => {
   const { identifier, password } = req.body; // identifier can be email, username, or phone
 
   if (!identifier || !password) {
@@ -148,10 +148,13 @@ authRouter.post('/login', (req: Request, res: Response) => {
     },
     token: `token_${user.id}_${Date.now()}`,
   });
-});
+};
 
-// POST /api/auth/google
-authRouter.post('/google', async (req: Request, res: Response) => {
+authRouter.post('/login', handleLogin);
+authRouter.post('/auth/login', handleLogin);
+
+// POST /api/auth/google or /api/google
+const handleGoogleAuth = async (req: Request, res: Response) => {
   const { googleEmail, name, googleId, picture } = req.body;
 
   if (!googleEmail) {
@@ -220,10 +223,13 @@ authRouter.post('/google', async (req: Request, res: Response) => {
     },
     token: `token_${user.id}_${Date.now()}`,
   });
-});
+};
 
-// POST /api/auth/recover-password
-authRouter.post('/recover-password', async (req: Request, res: Response) => {
+authRouter.post('/google', handleGoogleAuth);
+authRouter.post('/auth/google', handleGoogleAuth);
+
+// POST /api/auth/recover-password or /api/recover-password
+const handleRecoverPassword = async (req: Request, res: Response) => {
   const { identifier } = req.body;
 
   if (!identifier) {
@@ -269,10 +275,13 @@ authRouter.post('/recover-password', async (req: Request, res: Response) => {
     hint: `رمز التحقق الخاص بك لإعادة تعيين كلمة السر هو: ${resetCode}`,
     resetLink,
   });
-});
+};
 
-// POST /api/auth/test-email
-authRouter.post('/test-email', async (req: Request, res: Response) => {
+authRouter.post('/recover-password', handleRecoverPassword);
+authRouter.post('/auth/recover-password', handleRecoverPassword);
+
+// POST /api/auth/test-email or /api/test-email
+const handleTestEmail = async (req: Request, res: Response) => {
   const { email, name } = req.body;
   const targetEmail = email || 'm.roket365@gmail.com';
   const targetName = name || 'مستخدم رفيق التجريبي';
@@ -285,10 +294,13 @@ authRouter.post('/test-email', async (req: Request, res: Response) => {
       ? 'تم تسليم الرسالة التجريبية بنجاح عبر Resend!'
       : 'تحقق من صحة RESEND_API_KEY ونطاق الإرسال في Resend.',
   });
-});
+};
 
-// POST /api/auth/reset-password
-authRouter.post('/reset-password', (req: Request, res: Response) => {
+authRouter.post('/test-email', handleTestEmail);
+authRouter.post('/auth/test-email', handleTestEmail);
+
+// POST /api/auth/reset-password or /api/reset-password
+const handleResetPassword = (req: Request, res: Response) => {
   const { identifier, codeOrToken, newPassword } = req.body;
 
   if (!identifier || !codeOrToken || !newPassword) {
@@ -328,10 +340,13 @@ authRouter.post('/reset-password', (req: Request, res: Response) => {
     success: true,
     message: 'تم تغيير كلمة السر بنجاح! يمكنك الآن تسجيل الدخول بكلمة السر الجديدة.',
   });
-});
+};
 
-// POST /api/auth/sync
-authRouter.post('/sync', (req: Request, res: Response) => {
+authRouter.post('/reset-password', handleResetPassword);
+authRouter.post('/auth/reset-password', handleResetPassword);
+
+// POST /api/auth/sync or /api/sync
+const handleSync = (req: Request, res: Response) => {
   const { userId, profileData, messagesData, itemsData } = req.body;
 
   if (!userId) {
@@ -351,10 +366,13 @@ authRouter.post('/sync', (req: Request, res: Response) => {
   db.upsertUser(user);
 
   return res.json({ message: 'Data synchronized successfully' });
-});
+};
 
-// POST /api/user/update-profile (Real-time Profile Updates and Synchronization)
-authRouter.post('/user/update-profile', (req: Request, res: Response) => {
+authRouter.post('/sync', handleSync);
+authRouter.post('/auth/sync', handleSync);
+
+// POST /api/user/update-profile or /api/auth/user/update-profile (Real-time Profile Updates and Synchronization)
+const handleUpdateProfile = (req: Request, res: Response) => {
   const { userId, name, username, phone, addressAs, companionGender, language, theme, timezone } = req.body;
 
   if (!userId) {
@@ -413,7 +431,10 @@ authRouter.post('/user/update-profile', (req: Request, res: Response) => {
       createdAt: user.createdAt,
     },
   });
-});
+};
+
+authRouter.post('/user/update-profile', handleUpdateProfile);
+authRouter.post('/auth/user/update-profile', handleUpdateProfile);
 
 // POST /api/auth/send-verification-otp
 authRouter.post('/send-verification-otp', (req: Request, res: Response) => {

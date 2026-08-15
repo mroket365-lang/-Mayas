@@ -71,6 +71,8 @@ class RealtimeClient {
 
       this.eventSource.onopen = () => {
         this.isConnecting = false;
+        this.isSSEConnected = true;
+        this.consecutiveErrors = 0;
       };
 
       // Handle general message event
@@ -115,31 +117,40 @@ class RealtimeClient {
 
       this.eventSource.onerror = () => {
         this.isConnecting = false;
+        this.isSSEConnected = false;
+        this.consecutiveErrors++;
         try {
           this.eventSource?.close();
         } catch (e) {}
         this.eventSource = null;
-        // Fast reconnect after 1.5s
+        // Reconnect after 5s if disconnected
         setTimeout(() => {
-          if (!this.eventSource) {
+          if (!this.eventSource && typeof document !== 'undefined' && document.visibilityState === 'visible') {
             this.connect();
           }
-        }, 1500);
+        }, 5000);
       };
     } catch (err) {
       console.warn('EventSource connect failed, using fast fallback sync:', err);
     }
   }
 
-  // Fast sub-second synchronization loop
+  private isSSEConnected: boolean = false;
+  private consecutiveErrors: number = 0;
+
+  // Adaptive background sync loop - calm and efficient
   private startFastHeartbeat() {
     if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
-    // Polls every 800ms when document is visible to guarantee absolute < 1-second sync
+    // Polls only every 15s if SSE is active, or every 5s if disconnected (with exponential backoff on errors)
     this.heartbeatInterval = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        // If SSE is connected and working, no need for aggressive polling
+        if (this.isSSEConnected && this.consecutiveErrors === 0) {
+          return;
+        }
         this.forceSync();
       }
-    }, 850);
+    }, 10000);
   }
 
   public async forceSync(): Promise<SystemPublicSettings | null> {
@@ -160,6 +171,7 @@ class RealtimeClient {
       });
 
       if (res.ok) {
+        this.consecutiveErrors = 0;
         const data: SystemPublicSettings = await res.json();
         // Check if changed
         if (JSON.stringify(data) !== JSON.stringify(this.lastSettingsData)) {
@@ -168,9 +180,11 @@ class RealtimeClient {
           this.broadcastLocally('settings_updated', data);
         }
         return data;
+      } else {
+        this.consecutiveErrors++;
       }
     } catch (e) {
-      // ignore
+      this.consecutiveErrors++;
     }
     return null;
   }

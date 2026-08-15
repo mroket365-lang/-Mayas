@@ -122,7 +122,7 @@ export default function App() {
 
   // Automatic debounced cloud backup & synchronization for logged-in users
   useEffect(() => {
-    if (!profile.id) return;
+    if (!profile.id || profile.id === 'user_default_01') return;
 
     const syncTimer = setTimeout(() => {
       fetch('/api/auth/sync', {
@@ -134,8 +134,10 @@ export default function App() {
           messagesData: messages.slice(-100), // Keep last 100 messages synced
           itemsData: items,
         }),
-      }).catch((err) => console.warn('Background database sync notice:', err));
-    }, 2000);
+      }).catch(() => {
+        // Silently handle offline/sync failures without cluttering logs
+      });
+    }, 3000);
 
     return () => clearTimeout(syncTimer);
   }, [profile, messages, items]);
