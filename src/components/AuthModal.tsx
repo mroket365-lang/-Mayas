@@ -153,36 +153,121 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
     }
   };
 
+  const [googleClientId, setGoogleClientId] = useState<string>(() => {
+    return (
+      (window as any).__GOOGLE_CLIENT_ID__ ||
+      (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID ||
+      ''
+    );
+  });
+  const [showClientIdPrompt, setShowClientIdPrompt] = useState(false);
+  const [customClientIdInput, setCustomClientIdInput] = useState('');
+
+  // Fetch system settings to retrieve backend-configured googleClientId if any
+  React.useEffect(() => {
+    fetch('/api/public/settings')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.googleClientId && !googleClientId) {
+          setGoogleClientId(data.googleClientId);
+        }
+      })
+      .catch(() => {});
+  }, [googleClientId]);
+
+  const executeGoogleOAuth = (clientIdToUse: string) => {
+    const googleObj = (window as any).google;
+    if (!googleObj?.accounts?.oauth2) {
+      setError('جاري تحميل مكتبة تسجيل الدخول من جوجل، يرجى المحاولة بعد ثوانٍ');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const client = googleObj.accounts.oauth2.initTokenClient({
+        client_id: clientIdToUse.trim(),
+        scope: 'email profile openid',
+        prompt: 'select_account',
+        callback: async (tokenResponse: any) => {
+          if (tokenResponse.error) {
+            setLoading(false);
+            if (tokenResponse.error !== 'access_denied') {
+              setError(`خطأ أثناء تسجيل الدخول بجوجل: ${tokenResponse.error_description || tokenResponse.error}`);
+            }
+            return;
+          }
+
+          try {
+            setLoading(true);
+            setSuccessMsg('جاري جلب بيانات حساب جوجل المعتمد...');
+
+            // Fetch real profile from Google's official userinfo endpoint
+            const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+              headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+            });
+
+            if (!userRes.ok) {
+              throw new Error('تعذر جلب معلومات الحساب من خوادم Google');
+            }
+
+            const googleProfile = await userRes.json();
+            if (!googleProfile.email) {
+              throw new Error('لم نتمكن من الحصول على البريد الإلكتروني لحساب جوجل');
+            }
+
+            // Send real authenticated Google account to backend
+            const res = await fetch('/api/google', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                googleEmail: googleProfile.email,
+                name: googleProfile.name || googleProfile.given_name || googleProfile.email.split('@')[0],
+                picture: googleProfile.picture || '',
+                googleId: googleProfile.sub,
+                accessToken: tokenResponse.access_token,
+              }),
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'فشل التسجيل بحساب جوجل');
+
+            setSuccessMsg(`تم بنجاح ربط حسابك الحقيقي (${googleProfile.email}) وتم إرسال رسالة الترحيب لبريدك!`);
+            setTimeout(() => {
+              onLoginSuccess(data.user);
+              onClose();
+            }, 1200);
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'فشل الاتصال بخوادم جوجل';
+            setError(msg);
+          } finally {
+            setLoading(false);
+          }
+        },
+      });
+
+      // Triggers Google's official account selector dialog popup
+      client.requestAccessToken({ prompt: 'select_account' });
+    } catch (err: unknown) {
+      setLoading(false);
+      const msg = err instanceof Error ? err.message : 'تعذر بدء نافذة تسجيل جوجل';
+      setError(msg);
+    }
+  };
+
   const handleGoogleAuth = async () => {
     setLoading(true);
     setError(null);
+    setSuccessMsg(null);
 
-    try {
-      const fakeGoogleEmail = `user_${Math.floor(1000 + Math.random() * 9000)}@gmail.com`;
-      const res = await fetch('/api/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          googleEmail: fakeGoogleEmail,
-          name: 'مستخدم جوجل',
-          googleId: `goog_${Date.now()}`,
-        }),
-      });
+    const activeClientId = googleClientId || customClientIdInput;
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'فشل التسجيل بحساب جوجل');
-
-      setSuccessMsg('تم الربط بحساب جوجل بنجاح!');
-      setTimeout(() => {
-        onLoginSuccess(data.user);
-        onClose();
-      }, 1000);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'فشل التسجيل عبر جوجل';
-      setError(msg);
-    } finally {
+    if (!activeClientId) {
       setLoading(false);
+      setShowClientIdPrompt(true);
+      return;
     }
+
+    executeGoogleOAuth(activeClientId);
   };
 
   return (
@@ -484,6 +569,60 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
             )}
           </button>
         </form>
+
+        {/* Google Client ID Config Prompt if needed */}
+        {showClientIdPrompt && (
+          <div className="p-4 rounded-2xl bg-[var(--bg-main)] border border-[var(--border-color)] space-y-3 text-xs animate-fade-in">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-[var(--text-main)]">
+                {isArabic ? '⚙️ إعداد معرف حساب جوجل (Google Client ID)' : '⚙️ Configure Google Client ID'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowClientIdPrompt(false)}
+                className="text-[var(--text-muted)] hover:text-[var(--text-main)] text-sm"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-[var(--text-muted)] leading-relaxed">
+              {isArabic
+                ? 'لفتح نافذة اختيار حسابات جوجل الرسمية، أدخل معرف العميل (Client ID) المأخوذ من Google Cloud Console، أو قم بضبطه في متغيرات البيئة باسم GOOGLE_CLIENT_ID:'
+                : 'Enter your OAuth Client ID from Google Cloud Console, or configure GOOGLE_CLIENT_ID in your environment variables:'}
+            </p>
+            <input
+              type="text"
+              value={customClientIdInput}
+              onChange={(e) => setCustomClientIdInput(e.target.value)}
+              placeholder="123456789-xxxxx.apps.googleusercontent.com"
+              className="w-full px-3 py-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-main)] text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[var(--accent-sage)]"
+            />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (customClientIdInput.trim()) {
+                    setGoogleClientId(customClientIdInput.trim());
+                    setShowClientIdPrompt(false);
+                    executeGoogleOAuth(customClientIdInput.trim());
+                  } else {
+                    setError('يرجى إدخال معرف عميل جوجل صالح أو التسجيل بالبريد بالأعلى');
+                  }
+                }}
+                className="flex-1 py-2 bg-[var(--accent-sage)] text-white font-bold rounded-xl hover:opacity-90 transition-all"
+              >
+                {isArabic ? 'متابعة عبر جوجل' : 'Continue with Google'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowClientIdPrompt(false)}
+                className="px-3 py-2 border border-[var(--border-color)] text-[var(--text-muted)] rounded-xl hover:bg-[var(--bg-hover)] transition-all"
+              >
+                {isArabic ? 'إلغاء' : 'Cancel'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Google Auth Divider & Button */}
         <div className="relative flex items-center justify-center my-2">

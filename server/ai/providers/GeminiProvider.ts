@@ -2,14 +2,17 @@ import { GoogleGenAI, FunctionDeclaration, Type } from '@google/genai';
 import { AIProvider, AIProviderParams } from './AIProvider';
 import { ProviderResponse, ToolCallRequest } from '../types';
 
-const geminiClient = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
+function getGeminiClient(): GoogleGenAI {
+  const apiKey = process.env.GEMINI_API_KEY || '';
+  return new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
     },
-  },
-});
+  });
+}
 
 export const geminiToolDeclarations: FunctionDeclaration[] = [
   {
@@ -159,7 +162,8 @@ export class GeminiProvider extends AIProvider {
     for (const modelName of Array.from(new Set(modelsToTry))) {
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
-          const res = await geminiClient.models.generateContent({
+          const client = getGeminiClient();
+          const res = await client.models.generateContent({
             model: modelName,
             contents: params.contents as any,
             config: {
@@ -213,7 +217,8 @@ export class GeminiProvider extends AIProvider {
     for (const modelName of Array.from(new Set(modelsToTry))) {
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
-          const stream = await geminiClient.models.generateContentStream({
+          const client = getGeminiClient();
+          const stream = await client.models.generateContentStream({
             model: modelName,
             contents: params.contents as any,
             config: {

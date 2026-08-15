@@ -406,7 +406,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           )}
 
           {/* 4.6 Marital Intimacy & Special Needs Counseling Card */}
-          {onOpenMaritalSupport && (
+          {systemSettings?.maritalSupportAllowed !== false && onOpenMaritalSupport && (
             <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-500/10 via-pink-500/10 to-amber-500/10 border border-rose-500/30 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">

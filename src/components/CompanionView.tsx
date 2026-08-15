@@ -83,7 +83,7 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(({
       } space-y-1.5 animate-fade-in`}
     >
       <div
-        className={`max-w-[85%] rounded-3xl px-4 py-3 shadow-sm text-sm leading-relaxed ${
+        className={`max-w-[85%] sm:max-w-[80%] rounded-3xl px-4 py-3 shadow-sm text-sm leading-relaxed min-w-0 break-words [overflow-wrap:anywhere] ${
           msg.sender === 'user'
             ? 'bg-[var(--accent-sage)] text-white rounded-br-none'
             : 'bg-[var(--bg-surface)] text-[var(--text-main)] border border-[var(--border-color)] rounded-bl-none'
@@ -115,10 +115,10 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(({
           </div>
         )}
 
-        <p className="whitespace-pre-wrap select-text">
+        <p className="whitespace-pre-wrap select-text break-words [overflow-wrap:anywhere] min-w-0">
           {msg.text}
           {isLoading && isLast && msg.sender === 'ai' && (
-            <span className="inline-block w-2 h-4 bg-[var(--accent-sage)] ml-1 animate-pulse rounded-full align-middle" />
+            <span className="inline-block w-2 h-4 bg-[var(--accent-sage)] ml-1 animate-pulse rounded-full align-middle shrink-0" />
           )}
         </p>
 
@@ -801,17 +801,17 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
 
                 {/* Popover options menu */}
                 {isPlusMenuOpen && (
-                  <div className="absolute bottom-full mb-2 start-0 z-50 w-56 p-2 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl space-y-1 animate-scale-up">
+                  <div className="absolute bottom-full mb-2 start-0 z-50 min-w-[15rem] w-64 p-2 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl space-y-1.5 animate-scale-up">
                     <button
                       type="button"
                       onClick={() => {
                         setIsPlusMenuOpen(false);
                         fileInputRef.current?.click();
                       }}
-                      className="w-full px-3 py-2.5 rounded-xl hover:bg-[var(--bg-hover)] text-xs font-bold text-[var(--text-main)] flex items-center gap-2.5 transition-all text-start"
+                      className="w-full px-3 py-2.5 rounded-xl hover:bg-[var(--bg-hover)] text-xs font-bold text-[var(--text-main)] flex items-center gap-2.5 transition-all text-start whitespace-nowrap"
                     >
                       <Paperclip className="w-4 h-4 text-[var(--accent-sage)] shrink-0" />
-                      <span>{profile.language === 'ar' ? 'رفع صورة أو مستند' : 'Attach Photo or Document'}</span>
+                      <span className="whitespace-nowrap">{profile.language === 'ar' ? 'رفع صورة أو مستند' : 'Attach Photo or Document'}</span>
                     </button>
 
                     <button
@@ -820,10 +820,10 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
                         setIsPlusMenuOpen(false);
                         startVoiceInteraction();
                       }}
-                      className="w-full px-3 py-2.5 rounded-xl hover:bg-[var(--bg-hover)] text-xs font-bold text-[var(--text-main)] flex items-center gap-2.5 transition-all text-start"
+                      className="w-full px-3 py-2.5 rounded-xl hover:bg-[var(--bg-hover)] text-xs font-bold text-[var(--text-main)] flex items-center gap-2.5 transition-all text-start whitespace-nowrap"
                     >
                       <Mic className="w-4 h-4 text-emerald-500 shrink-0" />
-                      <span>{profile.language === 'ar' ? 'المحادثة الصوتية المباشرة' : 'Live Voice Conversation'}</span>
+                      <span className="whitespace-nowrap">{profile.language === 'ar' ? 'المحادثة الصوتية المباشرة' : 'Live Voice Conversation'}</span>
                     </button>
                   </div>
                 )}

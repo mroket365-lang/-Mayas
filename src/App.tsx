@@ -229,6 +229,9 @@ export default function App() {
       time24,
     };
 
+    let finalData: any = null;
+    let streamSuccess = false;
+
     try {
       const response = await fetch('/api/companion/chat-stream', {
         method: 'POST',
@@ -244,101 +247,130 @@ export default function App() {
         }),
       });
 
-      if (!response.ok || !response.body) {
-        throw new Error(`Server error (${response.status})`);
-      }
+      if (response.ok && response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      let buffer = '';
-      let finalData: any = null;
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
 
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n\n');
+          buffer = lines.pop() || '';
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('data: ')) {
-            try {
-              const parsed = JSON.parse(trimmed.slice(6));
-              if (parsed.text) {
-                currentStreamingText += parsed.text;
-                const chunkText = currentStreamingText;
-                setMessages((prev) =>
-                  prev.map((m) => (m.id === aiMsgId ? { ...m, text: chunkText } : m))
-                );
-              }
-              if (parsed.done) {
-                finalData = parsed;
-              }
-            } catch (_) {}
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('data: ')) {
+              try {
+                const parsed = JSON.parse(trimmed.slice(6));
+                if (parsed.text) {
+                  currentStreamingText += parsed.text;
+                  const chunkText = currentStreamingText;
+                  setMessages((prev) =>
+                    prev.map((m) => (m.id === aiMsgId ? { ...m, text: chunkText } : m))
+                  );
+                }
+                if (parsed.done) {
+                  finalData = parsed;
+                  streamSuccess = true;
+                }
+              } catch (_) {}
+            }
           }
         }
+
+        if (buffer.trim().startsWith('data: ')) {
+          try {
+            const parsed = JSON.parse(buffer.trim().slice(6));
+            if (parsed.done) {
+              finalData = parsed;
+              streamSuccess = true;
+            }
+          } catch (_) {}
+        }
       }
-
-      if (buffer.trim().startsWith('data: ')) {
-        try {
-          const parsed = JSON.parse(buffer.trim().slice(6));
-          if (parsed.done) finalData = parsed;
-        } catch (_) {}
-      }
-
-      const replyText =
-        finalData?.replyText ||
-        currentStreamingText ||
-        (profile.language === 'ar' ? 'تم تسجيل رسالتك' : 'Got it!');
-      const actions = finalData?.actions || [];
-      const createdOrUpdatedItems = finalData?.createdOrUpdatedItems || [];
-      const updatedProfile = finalData?.updatedProfile;
-
-      if (updatedProfile) {
-        handleUpdateProfile({ ...profile, ...updatedProfile });
-      }
-
-      if (createdOrUpdatedItems && createdOrUpdatedItems.length > 0) {
-        createdOrUpdatedItems.forEach((item: CompanionItem) => {
-          const exists = items.some((i) => i.id === item.id);
-          if (exists) {
-            handleUpdateItem(item);
-          } else {
-            handleAddItem(item);
-          }
-        });
-        alarmEngine.playChimeSound('success');
-      }
-
-      const finalAiMsg: ChatMessage = {
-        id: aiMsgId,
-        sender: 'ai',
-        text: replyText,
-        timestamp: new Date().toISOString(),
-        actionsTaken: actions,
-      };
-
-      storageService.addMessage(finalAiMsg);
-      setMessages((prev) => prev.map((m) => (m.id === aiMsgId ? finalAiMsg : m)));
-    } catch (e) {
-      console.error('Send message error:', e);
-      const fallbackText =
-        profile.language === 'ar'
-          ? 'عذراً يا غالي، تعثر الاتصال بالخادم. حاول ثانية!'
-          : 'Sorry my friend, connection issue. Please retry!';
-      const errorMsg: ChatMessage = {
-        id: aiMsgId,
-        sender: 'ai',
-        text: fallbackText,
-        timestamp: new Date().toISOString(),
-      };
-      setMessages((prev) => prev.map((m) => (m.id === aiMsgId ? errorMsg : m)));
-      storageService.addMessage(errorMsg);
-    } finally {
-      setIsLoadingAI(false);
+    } catch (streamErr) {
+      console.warn('Streaming response unavailable, switching to standard JSON endpoint:', streamErr);
     }
+
+    // Fallback seamlessly to standard non-streaming POST if stream failed or did not finish
+    if (!streamSuccess) {
+      try {
+        const res = await fetch('/api/companion/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: text,
+            history: updatedMessages.map((m) => ({ sender: m.sender, text: m.text, timestamp: m.timestamp })),
+            profile,
+            items,
+            mediaBase64: media?.base64,
+            mediaMimeType: media?.mimeType,
+            clientTimeContext,
+          }),
+        });
+
+        if (res.ok) {
+          finalData = await res.json();
+        } else {
+          throw new Error(`Fallback HTTP ${res.status}`);
+        }
+      } catch (fallbackErr) {
+        console.error('Send message error:', fallbackErr);
+        const fallbackText =
+          profile.language === 'ar'
+            ? 'عذراً يا غالي، تعثر الاتصال بالخادم. حاول ثانية!'
+            : 'Sorry my friend, connection issue. Please retry!';
+        const errorMsg: ChatMessage = {
+          id: aiMsgId,
+          sender: 'ai',
+          text: fallbackText,
+          timestamp: new Date().toISOString(),
+        };
+        setMessages((prev) => prev.map((m) => (m.id === aiMsgId ? errorMsg : m)));
+        storageService.addMessage(errorMsg);
+        setIsLoadingAI(false);
+        return;
+      }
+    }
+
+    const replyText =
+      finalData?.replyText ||
+      currentStreamingText ||
+      (profile.language === 'ar' ? 'تم تسجيل رسالتك' : 'Got it!');
+    const actions = finalData?.actions || [];
+    const createdOrUpdatedItems = finalData?.createdOrUpdatedItems || [];
+    const updatedProfile = finalData?.updatedProfile;
+
+    if (updatedProfile) {
+      handleUpdateProfile({ ...profile, ...updatedProfile });
+    }
+
+    if (createdOrUpdatedItems && createdOrUpdatedItems.length > 0) {
+      createdOrUpdatedItems.forEach((item: CompanionItem) => {
+        const exists = items.some((i) => i.id === item.id);
+        if (exists) {
+          handleUpdateItem(item);
+        } else {
+          handleAddItem(item);
+        }
+      });
+      alarmEngine.playChimeSound('success');
+    }
+
+    const finalAiMsg: ChatMessage = {
+      id: aiMsgId,
+      sender: 'ai',
+      text: replyText,
+      timestamp: new Date().toISOString(),
+      actionsTaken: actions,
+    };
+
+    storageService.addMessage(finalAiMsg);
+    setMessages((prev) => prev.map((m) => (m.id === aiMsgId ? finalAiMsg : m)));
+    setIsLoadingAI(false);
   };
 
   // Start End of Day Review
@@ -452,7 +484,11 @@ export default function App() {
             messages={messages}
             profile={profile}
             items={items}
-            onOpenMaritalSupport={() => setIsMaritalSupportOpen(true)}
+            onOpenMaritalSupport={
+              systemSettings?.maritalSupportAllowed !== false
+                ? () => setIsMaritalSupportOpen(true)
+                : undefined
+            }
             onSendMessage={handleSendMessage}
             isLoading={isLoadingAI}
             onOpenPermissions={() => setIsPermissionsOpen(true)}
@@ -550,10 +586,14 @@ export default function App() {
           onClose={() => setIsSettingsOpen(false)}
           onClearMemory={handleClearMemory}
           onExportData={handleExportData}
-          onOpenMaritalSupport={() => {
-            setIsSettingsOpen(false);
-            setIsMaritalSupportOpen(true);
-          }}
+          onOpenMaritalSupport={
+            systemSettings?.maritalSupportAllowed !== false
+              ? () => {
+                  setIsSettingsOpen(false);
+                  setIsMaritalSupportOpen(true);
+                }
+              : undefined
+          }
           onOpenSubscription={() => {
             setIsSettingsOpen(false);
             setIsSubscriptionOpen(true);

@@ -58,12 +58,17 @@ export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({ token }) =
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('system_settings_updated'));
       try {
-        const bc = new BroadcastChannel('rafiq_settings_sync');
-        bc.postMessage('updated');
+        const bc = new BroadcastChannel('rafiq_realtime_sync');
+        bc.postMessage({ type: 'settings_updated' });
         bc.close();
       } catch (e) {
         // ignore
       }
+      try {
+        const bc2 = new BroadcastChannel('rafiq_settings_sync');
+        bc2.postMessage('updated');
+        bc2.close();
+      } catch (e) {}
     }
   };
 

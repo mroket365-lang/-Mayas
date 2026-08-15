@@ -109,6 +109,8 @@ async function startServer() {
       updatedAt: (settings as any).updatedAt || new Date().toISOString(),
       plans: db.getPlans().filter((p) => p.active),
       paymentMethods: (settings.paymentMethods || []).filter((p) => p.enabled),
+      googleClientId: process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '',
+      resendConfigured: Boolean(process.env.RESEND_API_KEY || process.env.RESEND_KEY || process.env.VITE_RESEND_API_KEY),
     });
   });
 

@@ -137,16 +137,16 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Quick Tools Dropdown Card */}
           {isToolsMenuOpen && (
-            <div className="absolute top-full mt-2 end-0 z-50 w-72 sm:w-80 p-3 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl space-y-3 animate-fade-in text-xs">
+            <div className="absolute top-full mt-2 end-0 z-50 w-80 min-w-[18rem] max-w-[calc(100vw-1.5rem)] p-3.5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl space-y-3 animate-fade-in text-xs">
               <div className="flex items-center justify-between pb-2 border-b border-[var(--border-color)]">
-                <span className="font-extrabold text-[var(--text-muted)] uppercase tracking-wider text-[10px]">
+                <span className="font-extrabold text-[var(--text-muted)] uppercase tracking-wider text-[10px] whitespace-nowrap">
                   {isArabic ? 'أدوات الخيارات السريعة' : 'Quick Options'}
                 </span>
                 <button
                   onClick={() => setIsToolsMenuOpen(false)}
-                  className="p-1 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                  className="p-1 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] transition-colors"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
@@ -157,13 +157,13 @@ export const Header: React.FC<HeaderProps> = ({
                   onClick={toggleTheme}
                   className="p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--text-main)] font-bold flex items-center justify-between transition-all"
                 >
-                  <span className="flex items-center gap-1.5">
+                  <span className="flex items-center gap-1.5 whitespace-nowrap">
                     {profile.theme === 'dark' ? (
-                      <Sun className="w-4 h-4 text-amber-400" />
+                      <Sun className="w-4 h-4 text-amber-400 shrink-0" />
                     ) : (
-                      <Moon className="w-4 h-4 text-slate-700 dark:text-slate-200" />
+                      <Moon className="w-4 h-4 text-slate-700 dark:text-slate-200 shrink-0" />
                     )}
-                    <span>{profile.theme === 'dark' ? t.themeLight : t.themeDark}</span>
+                    <span className="whitespace-nowrap">{profile.theme === 'dark' ? t.themeLight : t.themeDark}</span>
                   </span>
                 </button>
 
@@ -176,18 +176,18 @@ export const Header: React.FC<HeaderProps> = ({
                   className="p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--text-main)] font-bold flex items-center gap-1.5 transition-all"
                 >
                   <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span className="truncate">{t.permissionsTitle}</span>
+                  <span className="truncate whitespace-nowrap">{t.permissionsTitle}</span>
                 </button>
               </div>
 
               {/* Language Selector */}
               <div className="p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] space-y-2">
                 <div className="flex items-center justify-between text-[11px] font-bold text-[var(--text-muted)]">
-                  <span className="flex items-center gap-1">
-                    <Globe className="w-3.5 h-3.5 text-[var(--accent-sage)]" />
-                    <span>{t.chooseLanguage}</span>
+                  <span className="flex items-center gap-1 whitespace-nowrap">
+                    <Globe className="w-3.5 h-3.5 text-[var(--accent-sage)] shrink-0" />
+                    <span className="whitespace-nowrap">{t.chooseLanguage}</span>
                   </span>
-                  <span className="font-mono text-[var(--text-main)]">{currentLangObj.flag} {currentLangObj.nativeName}</span>
+                  <span className="font-mono text-[var(--text-main)] whitespace-nowrap">{currentLangObj.flag} {currentLangObj.nativeName}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
                   {supportedLanguages.slice(0, 4).map((lang) => (
@@ -200,7 +200,7 @@ export const Header: React.FC<HeaderProps> = ({
                           : 'bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
                       }`}
                     >
-                      <span className="truncate">{lang.flag} {lang.nativeName}</span>
+                      <span className="truncate whitespace-nowrap">{lang.flag} {lang.nativeName}</span>
                       {profile.language === lang.code && <Check className="w-3 h-3 shrink-0" />}
                     </button>
                   ))}
@@ -222,18 +222,18 @@ export const Header: React.FC<HeaderProps> = ({
                       : 'border-[var(--border-color)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--text-main)]'
                   }`}
                 >
-                  <span className="flex items-center gap-2">
+                  <span className="flex items-center gap-2 whitespace-nowrap">
                     <Flame className="w-4 h-4 text-amber-500 animate-pulse shrink-0" />
-                    <span>{isArabic ? 'نمط الحوارات الخاصة' : 'Private Candid Mode'}</span>
+                    <span className="whitespace-nowrap">{isArabic ? 'نمط الحوارات الخاصة' : 'Private Candid Mode'}</span>
                   </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 font-bold whitespace-nowrap shrink-0">
                     {profile.privateCandidMode ? (isArabic ? 'مُفعّل' : 'ON') : (isArabic ? 'مُعطّل' : 'OFF')}
                   </span>
                 </button>
               )}
 
               {/* Marital Support Session */}
-              {onOpenMaritalSupport && (
+              {systemSettings?.maritalSupportAllowed !== false && onOpenMaritalSupport && (
                 <button
                   onClick={() => {
                     setIsToolsMenuOpen(false);
@@ -241,11 +241,11 @@ export const Header: React.FC<HeaderProps> = ({
                   }}
                   className="w-full p-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold flex items-center justify-between transition-all"
                 >
-                  <span className="flex items-center gap-2">
+                  <span className="flex items-center gap-2 whitespace-nowrap">
                     <HeartHandshake className="w-4 h-4 text-rose-500 animate-pulse shrink-0" />
-                    <span>{isArabic ? 'استشارة ودعم زوجي (18+)' : 'Marital Support (18+)'}</span>
+                    <span className="whitespace-nowrap">{isArabic ? 'استشارة ودعم زوجي (18+)' : 'Marital Support (18+)'}</span>
                   </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-600 font-extrabold">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-600 font-extrabold whitespace-nowrap">
                     {isArabic ? 'جلسة' : 'Session'}
                   </span>
                 </button>

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db, UserEntity } from '../db/database.js';
+import { EmailService } from '../services/emailService.js';
 
 export const authRouter = Router();
 
@@ -10,7 +11,7 @@ function generateAccountId(): string {
 }
 
 // POST /api/register or /api/auth/register
-const handleRegister = (req: Request, res: Response) => {
+const handleRegister = async (req: Request, res: Response) => {
   const { email, password, name, username, phone, profileData, messagesData, itemsData } = req.body;
 
   if (!email || !password || !name) {
@@ -67,10 +68,15 @@ const handleRegister = (req: Request, res: Response) => {
     updatedAt: new Date().toISOString(),
   });
 
-  console.log(`[Email Verification] Verification code ${verificationCode} sent to ${newUser.email}`);
+  console.log(`[Email Verification] Verification code ${verificationCode} generated for ${newUser.email}`);
+
+  // Send Welcome Email & Verification code via Resend
+  EmailService.sendWelcomeEmail(newUser.email, newUser.name, 'ar').catch((err) => {
+    console.warn('[handleRegister] Could not dispatch welcome email:', err);
+  });
 
   return res.json({
-    message: 'تم إنشاء الحساب بنجاح وتم تحويل رمز التحقق إلى بريدك الإلكتروني',
+    message: 'تم إنشاء الحساب بنجاح وتم إرسال رسالة الترحيب وتأكيد الحساب إلى بريدك الإلكتروني',
     verificationCodeSent: true,
     verificationCode,
     user: {
@@ -145,25 +151,31 @@ authRouter.post('/login', (req: Request, res: Response) => {
 });
 
 // POST /api/auth/google
-authRouter.post('/google', (req: Request, res: Response) => {
-  const { googleEmail, name, googleId } = req.body;
+authRouter.post('/google', async (req: Request, res: Response) => {
+  const { googleEmail, name, googleId, picture } = req.body;
 
   if (!googleEmail) {
     return res.status(400).json({ error: 'بريد جوجل غير صالح' });
   }
 
-  let user = db.getUsers().find((u) => u.email.toLowerCase() === googleEmail.toLowerCase());
+  const cleanEmail = googleEmail.trim().toLowerCase();
+  let user = db.getUsers().find((u) => u.email.toLowerCase() === cleanEmail);
+  let isNewUser = false;
 
   if (!user) {
+    isNewUser = true;
     const accountId = generateAccountId();
     user = {
       id: accountId,
-      email: googleEmail.trim().toLowerCase(),
-      name: name || googleEmail.split('@')[0],
+      email: cleanEmail,
+      name: name || cleanEmail.split('@')[0],
       role: 'user',
       status: 'active',
       createdAt: new Date().toISOString(),
       lastActiveAt: new Date().toISOString(),
+      profileData: {
+        avatar: picture || '',
+      },
     };
     db.upsertUser(user);
 
@@ -179,13 +191,21 @@ authRouter.post('/google', (req: Request, res: Response) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+
+    // Send Welcome Email to the real Google Account user
+    EmailService.sendWelcomeEmail(cleanEmail, user.name, 'ar').catch((err) => {
+      console.warn('[auth/google] Could not dispatch welcome email:', err);
+    });
   } else {
     user.lastActiveAt = new Date().toISOString();
+    if (name && !user.name) user.name = name;
     db.upsertUser(user);
   }
 
   return res.json({
-    message: 'تم تسجيل الدخول بحساب جوجل بنجاح',
+    message: isNewUser
+      ? 'تم إنشاء حسابك وربطه ببريد جوجل بنجاح وإرسال رسالة الترحيب إلى بريدك'
+      : 'تم تسجيل الدخول بحساب جوجل بنجاح',
     user: {
       id: user.id,
       accountId: user.id,
@@ -203,7 +223,7 @@ authRouter.post('/google', (req: Request, res: Response) => {
 });
 
 // POST /api/auth/recover-password
-authRouter.post('/recover-password', (req: Request, res: Response) => {
+authRouter.post('/recover-password', async (req: Request, res: Response) => {
   const { identifier } = req.body;
 
   if (!identifier) {
@@ -234,13 +254,36 @@ authRouter.post('/recover-password', (req: Request, res: Response) => {
   (user as any).resetTokenExpires = Date.now() + 30 * 60 * 1000;
   db.upsertUser(user);
 
-  console.log(`[Email Password Reset] Sent email to ${user.email}. Code: ${resetCode}, Link: https://rafiq.ai/reset-password?token=${resetToken}`);
+  console.log(`[Email Password Reset] Reset code ${resetCode} for ${user.email}`);
+
+  // Send password reset email via Resend
+  const appUrl = process.env.APP_URL || 'https://ais-pre-c2gl4sfut7jgdyzkbmw4bm-492461559935.europe-west3.run.app';
+  const resetLink = `${appUrl}?resetToken=${resetToken}`;
+  EmailService.sendPasswordResetEmail(user.email, user.name, resetCode, resetLink, 'ar').catch((err) => {
+    console.warn('[auth/recover-password] Could not dispatch reset email:', err);
+  });
 
   return res.json({
     success: true,
     message: `تم إرسال رابط استعادة كلمة السر ورمز التحقق إلى بريدك (${user.email}) بنجاح.`,
     hint: `رمز التحقق الخاص بك لإعادة تعيين كلمة السر هو: ${resetCode}`,
-    resetLink: `https://rafiq.ai/reset-password?token=${resetToken}`,
+    resetLink,
+  });
+});
+
+// POST /api/auth/test-email
+authRouter.post('/test-email', async (req: Request, res: Response) => {
+  const { email, name } = req.body;
+  const targetEmail = email || 'm.roket365@gmail.com';
+  const targetName = name || 'مستخدم رفيق التجريبي';
+
+  const result = await EmailService.sendWelcomeEmail(targetEmail, targetName, 'ar');
+  return res.json({
+    status: result.success ? 'success' : 'failed',
+    result,
+    hint: result.success
+      ? 'تم تسليم الرسالة التجريبية بنجاح عبر Resend!'
+      : 'تحقق من صحة RESEND_API_KEY ونطاق الإرسال في Resend.',
   });
 });
 
