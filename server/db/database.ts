@@ -150,14 +150,23 @@ export interface DatabaseSchema {
   settings: SystemSettingsEntity;
 }
 
-const DATA_DIR = path.join(process.cwd(), 'server_data');
+const DATA_DIR = process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(process.cwd(), 'server_data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
+
+// Priority Environment Variable Overrides for Super Admin
+const getEnvAdminEmail = (): string => {
+  return process.env.ADMIN_EMAIL || process.env.SUPER_ADMIN_EMAIL || 'admin@rafiq.ai';
+};
+
+const getEnvAdminPassword = (): string => {
+  return process.env.ADMIN_PASSWORD || process.env.SUPER_ADMIN_PASSWORD || 'AdminSecret2026!';
+};
 
 const defaultDatabase: DatabaseSchema = {
   users: [
     {
       id: 'admin_super_01',
-      email: 'admin@rafiq.ai',
+      email: getEnvAdminEmail(),
       name: 'Super Admin',
       role: 'super_admin',
       status: 'active',
@@ -254,8 +263,8 @@ const defaultDatabase: DatabaseSchema = {
     },
     privateCandidVisibility: { mode: 'hidden' },
     maritalSupportVisibility: { mode: 'hidden' },
-    superAdminEmail: 'admin@rafiq.ai',
-    superAdminPassword: 'AdminSecret2026!',
+    superAdminEmail: getEnvAdminEmail(),
+    superAdminPassword: getEnvAdminPassword(),
     paymentMethods: [
       {
         id: 'pm_bank_01',
@@ -307,22 +316,45 @@ class Database {
         fs.mkdirSync(DATA_DIR, { recursive: true });
       }
 
+      let loadedData: Partial<DatabaseSchema> = {};
+
       if (fs.existsSync(DB_FILE)) {
         const fileContent = fs.readFileSync(DB_FILE, 'utf-8');
-        const parsed = JSON.parse(fileContent);
-        const loadedUsers = (parsed.users || defaultDatabase.users).filter((u: any) => u.id !== 'user_default_01');
-        const loadedSubs = (parsed.subscriptions || defaultDatabase.subscriptions).filter((s: any) => s.userId !== 'user_default_01' && s.id !== 'sub_user_01');
-        return {
-          ...defaultDatabase,
-          ...parsed,
-          users: loadedUsers,
-          subscriptions: loadedSubs,
-          settings: { ...defaultDatabase.settings, ...(parsed.settings || {}) },
-        };
-      } else {
-        this.saveDatabase(defaultDatabase);
-        return defaultDatabase;
+        loadedData = JSON.parse(fileContent);
       }
+
+      const loadedUsers = (loadedData.users || defaultDatabase.users).filter((u: any) => u.id !== 'user_default_01');
+      const loadedSubs = (loadedData.subscriptions || defaultDatabase.subscriptions).filter((s: any) => s.userId !== 'user_default_01' && s.id !== 'sub_user_01');
+
+      const loadedSettings: Partial<SystemSettingsEntity> = loadedData.settings || {};
+
+      // Ensure Environment Variables take priority for admin email & password if explicitly configured
+      const finalAdminEmail = process.env.ADMIN_EMAIL || process.env.SUPER_ADMIN_EMAIL || loadedSettings.superAdminEmail || 'admin@rafiq.ai';
+      const finalAdminPassword = process.env.ADMIN_PASSWORD || process.env.SUPER_ADMIN_PASSWORD || loadedSettings.superAdminPassword || 'AdminSecret2026!';
+
+      const mergedSettings: SystemSettingsEntity = {
+        ...defaultDatabase.settings,
+        ...loadedSettings,
+        superAdminEmail: finalAdminEmail,
+        superAdminPassword: finalAdminPassword,
+      };
+
+      const finalDb: DatabaseSchema = {
+        ...defaultDatabase,
+        ...loadedData,
+        users: loadedUsers,
+        subscriptions: loadedSubs,
+        settings: mergedSettings,
+      };
+
+      // Ensure super admin user entity email matches mergedSettings
+      const superAdminUser = finalDb.users.find((u) => u.id === 'admin_super_01' || u.role === 'super_admin');
+      if (superAdminUser) {
+        superAdminUser.email = finalAdminEmail;
+      }
+
+      this.saveDatabase(finalDb);
+      return finalDb;
     } catch (e) {
       console.warn('Failed to load database from file, using in-memory default:', e);
       return defaultDatabase;
