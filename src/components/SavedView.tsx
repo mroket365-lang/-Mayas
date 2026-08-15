@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { CompanionItem, ItemType, UserProfile } from '../types';
 import { getTranslation } from '../locales/translations';
-import { Search, Plus, Trash2, CheckCircle2, Clock, Calendar, Bell, BookmarkCheck, Lightbulb, Repeat, AlertCircle, Edit3, Flame } from 'lucide-react';
+import { Search, Plus, Trash2, CheckCircle2, Clock, Calendar, Bell, BookmarkCheck, Lightbulb, Repeat, AlertCircle, Edit3, Flame, Target, Feather } from 'lucide-react';
 import { EditItemModal } from './EditItemModal';
 import { TaskItemCard } from './TaskItemCard';
+import { LongNoteModal } from './LongNoteModal';
+import { GoalPlanModal } from './GoalPlanModal';
 
 interface SavedViewProps {
   items: CompanionItem[];
@@ -23,6 +25,8 @@ export const SavedView: React.FC<SavedViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<ItemType | 'all'>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isLongNoteModalOpen, setIsLongNoteModalOpen] = useState(false);
+  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<CompanionItem | null>(null);
 
   // New item form state
@@ -32,16 +36,18 @@ export const SavedView: React.FC<SavedViewProps> = ({
   const [newTime, setNewTime] = useState('09:00');
 
   const t = getTranslation(profile.language);
+  const isArabic = profile.language === 'ar';
 
   const filterTabs: { id: ItemType | 'all'; label: string }[] = [
     { id: 'all', label: t.filterAll },
+    { id: 'goal', label: isArabic ? 'الأهداف والخطط 🎯' : 'Goals & Plans 🎯' },
     { id: 'task', label: t.filterTasks },
+    { id: 'note', label: isArabic ? 'الملاحظات والقصائد 📝' : 'Notes & Poetry 📝' },
     { id: 'appointment', label: t.filterAppointments },
     { id: 'reminder', label: t.filterReminders },
     { id: 'alarm', label: t.filterAlarms },
     { id: 'habit', label: t.filterHabits },
     { id: 'idea', label: t.filterIdeas },
-    { id: 'note', label: t.filterNotes },
     { id: 'memory', label: t.filterMemories },
   ];
 
@@ -87,19 +93,39 @@ export const SavedView: React.FC<SavedViewProps> = ({
 
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-3.5 pb-20">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <div>
           <h2 className="text-lg sm:text-xl font-bold text-[var(--text-main)]">{t.savedTitle}</h2>
           <p className="text-xs text-[var(--text-muted)]">{t.savedSubtitle}</p>
         </div>
 
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-sage)] text-white hover:opacity-90 font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>{t.addNewItem}</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => setIsLongNoteModalOpen(true)}
+            className="px-3 py-1.5 rounded-xl bg-teal-600/15 hover:bg-teal-600/25 text-teal-700 dark:text-teal-300 border border-teal-500/30 font-bold text-xs flex items-center gap-1 transition-all"
+            title={isArabic ? 'تدوين ملاحظة طويلة، قصيدة أو مقتطف' : 'New Long Note'}
+          >
+            <Feather className="w-3.5 h-3.5" />
+            <span>{isArabic ? 'ملاحظة / قصيدة' : 'Long Note'}</span>
+          </button>
+
+          <button
+            onClick={() => setIsGoalModalOpen(true)}
+            className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-1 transition-all"
+            title={isArabic ? 'إنشاء هدف محدد بوقت وخطة' : 'New Goal Plan'}
+          >
+            <Target className="w-3.5 h-3.5" />
+            <span>{isArabic ? 'خطة / هدف' : 'Goal Plan'}</span>
+          </button>
+
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-3 py-1.5 rounded-xl bg-[var(--accent-sage)] text-white hover:opacity-90 font-bold text-xs flex items-center gap-1 shadow-sm transition-all"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>{t.addNewItem}</span>
+          </button>
+        </div>
       </div>
 
       {/* Learned Memory Quick Summary Banner */}
@@ -261,6 +287,28 @@ export const SavedView: React.FC<SavedViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Long Note Modal */}
+      <LongNoteModal
+        isOpen={isLongNoteModalOpen}
+        onClose={() => setIsLongNoteModalOpen(false)}
+        profile={profile}
+        onSave={(newItem) => {
+          onAddItem(newItem);
+          setIsLongNoteModalOpen(false);
+        }}
+      />
+
+      {/* Goal & Plan Modal */}
+      <GoalPlanModal
+        isOpen={isGoalModalOpen}
+        onClose={() => setIsGoalModalOpen(false)}
+        profile={profile}
+        onSave={(newItem) => {
+          onAddItem(newItem);
+          setIsGoalModalOpen(false);
+        }}
+      />
     </div>
   );
 };

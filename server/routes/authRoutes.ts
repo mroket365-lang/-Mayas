@@ -18,9 +18,31 @@ const handleRegister = async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'البريد الإلكتروني، كلمة السر والاسم مطلوبان' });
   }
 
-  const existingEmail = db.getUsers().find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
+  const cleanEmail = email.trim().toLowerCase();
+  const existingEmail = db.getUsers().find((u) => u.email.toLowerCase() === cleanEmail);
   if (existingEmail) {
-    return res.status(400).json({ error: 'هذا البريد الإلكتروني مسجل بالفعل لدينا' });
+    if ((existingEmail as any).isEmailVerified === false) {
+      // Regenerate OTP code for previously unverified user
+      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+      (existingEmail as any).verificationCode = verificationCode;
+      (existingEmail as any).verificationExpiresAt = Date.now() + 15 * 60 * 1000;
+      if (password) existingEmail.passwordHash = password;
+      if (name) existingEmail.name = name.trim();
+      db.upsertUser(existingEmail);
+
+      EmailService.sendVerificationEmail(cleanEmail, existingEmail.name, verificationCode, 'ar').catch((err) => {
+        console.warn('[handleRegister] Could not dispatch OTP verification email:', err);
+      });
+
+      return res.json({
+        requiresVerification: true,
+        email: cleanEmail,
+        userId: existingEmail.id,
+        message: 'الحساب موجود ولكنه غير مفعل بعد. تم إرسال رمز تحقق جديد مكون من 6 أرقام إلى بريدك الإلكتروني.',
+      });
+    }
+
+    return res.status(400).json({ error: 'هذا البريد الإلكتروني مسجل ومفعل بالفعل لدينا. يرجى تسجيل الدخول' });
   }
 
   if (username) {
@@ -35,10 +57,10 @@ const handleRegister = async (req: Request, res: Response) => {
 
   const newUser: UserEntity = {
     id: accountId,
-    email: email.trim().toLowerCase(),
+    email: cleanEmail,
     username: username ? username.trim().toLowerCase() : undefined,
     phone: phone ? phone.trim() : undefined,
-    passwordHash: password, // In production app, hashed with bcrypt
+    passwordHash: password,
     name: name.trim(),
     role: 'user',
     status: 'active',
@@ -50,7 +72,8 @@ const handleRegister = async (req: Request, res: Response) => {
   };
 
   (newUser as any).verificationCode = verificationCode;
-  (newUser as any).isEmailVerified = true;
+  (newUser as any).verificationExpiresAt = Date.now() + 15 * 60 * 1000;
+  (newUser as any).isEmailVerified = false; // Enforce verification before activation
 
   db.upsertUser(newUser);
 
@@ -68,27 +91,18 @@ const handleRegister = async (req: Request, res: Response) => {
     updatedAt: new Date().toISOString(),
   });
 
-  console.log(`[Email Verification] Verification code ${verificationCode} generated for ${newUser.email}`);
+  console.log(`[Email Verification] OTP Code ${verificationCode} generated for ${newUser.email}`);
 
-  // Send Welcome Email & Verification code via Resend
-  EmailService.sendWelcomeEmail(newUser.email, newUser.name, 'ar').catch((err) => {
-    console.warn('[handleRegister] Could not dispatch welcome email:', err);
+  // Send Verification Email via Resend
+  EmailService.sendVerificationEmail(newUser.email, newUser.name, verificationCode, 'ar').catch((err) => {
+    console.warn('[handleRegister] Could not dispatch verification email:', err);
   });
 
   return res.json({
-    message: 'تم إنشاء الحساب بنجاح وتم إرسال رسالة الترحيب وتأكيد الحساب إلى بريدك الإلكتروني',
-    verificationCodeSent: true,
-    verificationCode,
-    user: {
-      id: newUser.id,
-      accountId: newUser.id,
-      email: newUser.email,
-      username: newUser.username,
-      phone: newUser.phone,
-      name: newUser.name,
-      role: newUser.role,
-    },
-    token: `token_${newUser.id}_${Date.now()}`,
+    requiresVerification: true,
+    email: newUser.email,
+    userId: newUser.id,
+    message: 'تم إنشاء الحساب بنجاح! تم إرسال رمز التحقق المكون من 6 أرقام إلى بريدك الإلكتروني لتأكيد الملكية.',
   });
 };
 
@@ -127,6 +141,25 @@ const handleLogin = (req: Request, res: Response) => {
 
   if (user.status === 'banned') {
     return res.status(403).json({ error: 'هذا الحساب محظور حالياً. يرجى التواصل مع الدعم الفني' });
+  }
+
+  // Check if email is verified
+  if ((user as any).isEmailVerified === false) {
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    (user as any).verificationCode = verificationCode;
+    (user as any).verificationExpiresAt = Date.now() + 15 * 60 * 1000;
+    db.upsertUser(user);
+
+    EmailService.sendVerificationEmail(user.email, user.name, verificationCode, 'ar').catch((err) => {
+      console.warn('[handleLogin] Could not dispatch OTP verification email:', err);
+    });
+
+    return res.json({
+      requiresVerification: true,
+      email: user.email,
+      userId: user.id,
+      message: 'بريدك الإلكتروني غير مؤكد بعد. تم إرسال رمز تحقق جديد إلى بريدك الإلكتروني.',
+    });
   }
 
   user.lastActiveAt = new Date().toISOString();
@@ -180,6 +213,7 @@ const handleGoogleAuth = async (req: Request, res: Response) => {
         avatar: picture || '',
       },
     };
+    (user as any).isEmailVerified = true; // Auto-verified via Google OAuth
     db.upsertUser(user);
 
     db.upsertSubscription({
@@ -201,6 +235,7 @@ const handleGoogleAuth = async (req: Request, res: Response) => {
     });
   } else {
     user.lastActiveAt = new Date().toISOString();
+    (user as any).isEmailVerified = true;
     if (name && !user.name) user.name = name;
     db.upsertUser(user);
   }
@@ -438,47 +473,62 @@ const handleUpdateProfile = (req: Request, res: Response) => {
 authRouter.post('/user/update-profile', handleUpdateProfile);
 authRouter.post('/auth/user/update-profile', handleUpdateProfile);
 
-// POST /api/auth/send-verification-otp
-authRouter.post('/send-verification-otp', (req: Request, res: Response) => {
+// POST /api/auth/send-verification-otp or /api/send-verification-otp
+const handleSendVerificationOtp = async (req: Request, res: Response) => {
   const { email, userId } = req.body;
 
-  let user = db.getUsers().find((u) => u.email.toLowerCase() === (email || '').toLowerCase() || u.id === userId);
+  const cleanEmail = (email || '').trim().toLowerCase();
+  let user = db.getUsers().find((u) => u.email.toLowerCase() === cleanEmail || u.id === userId);
+
+  if (!user) {
+    return res.status(404).json({ error: 'لم يتم العثور على حساب بهذا البريد الإلكتروني' });
+  }
 
   const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = Date.now() + 15 * 60 * 1000; // 15 mins
 
-  if (user) {
-    (user as any).verificationCode = otpCode;
-    (user as any).verificationExpiresAt = expiresAt;
-    db.upsertUser(user);
-  }
+  (user as any).verificationCode = otpCode;
+  (user as any).verificationExpiresAt = expiresAt;
+  db.upsertUser(user);
 
-  console.log(`[Email Verification OTP] Code for ${email || userId}: ${otpCode}`);
+  console.log(`[Email Verification OTP] Code for ${user.email}: ${otpCode}`);
+
+  EmailService.sendVerificationEmail(user.email, user.name, otpCode, 'ar').catch((err) => {
+    console.warn('[sendVerificationOtp] Failed sending email:', err);
+  });
 
   return res.json({
     success: true,
-    message: `تم إرسال رمز التحقق (OTP) إلى بريدك الإلكتروني (${email || 'المسجل'})`,
-    code: otpCode, // Provided for user preview and seamless verification
-    hint: `رمز التحقق المرسل لبريدك هو: ${otpCode}`,
+    message: `تم إرسال رمز التحقق (OTP) إلى بريدك الإلكتروني (${user.email})`,
   });
-});
+};
 
-// POST /api/auth/verify-otp
-authRouter.post('/verify-otp', (req: Request, res: Response) => {
+authRouter.post('/send-verification-otp', handleSendVerificationOtp);
+authRouter.post('/auth/send-verification-otp', handleSendVerificationOtp);
+
+// POST /api/auth/verify-otp or /api/verify-otp
+const handleVerifyOtp = (req: Request, res: Response) => {
   const { email, userId, code } = req.body;
 
   if (!code) {
     return res.status(400).json({ error: 'يرجى إدخال رمز التحقق المكون من 6 أرقام' });
   }
 
-  const user = db.getUsers().find((u) => u.email.toLowerCase() === (email || '').toLowerCase() || u.id === userId);
+  const cleanEmail = (email || '').trim().toLowerCase();
+  const user = db.getUsers().find((u) => u.email.toLowerCase() === cleanEmail || u.id === userId);
 
   if (!user) {
-    return res.status(404).json({ error: 'لم يتم العثور على المستخدم' });
+    return res.status(404).json({ error: 'لم يتم العثور على حساب بهذا البريد' });
   }
 
   const storedCode = (user as any).verificationCode;
-  if (storedCode && storedCode !== code.trim()) {
+  const expiresAt = (user as any).verificationExpiresAt;
+
+  if (expiresAt && Date.now() > expiresAt) {
+    return res.status(400).json({ error: 'انتهت صلاحية رمز التحقق، يرجى طلب رمز جديد' });
+  }
+
+  if (!storedCode || storedCode.trim() !== String(code).trim()) {
     return res.status(400).json({ error: 'رمز التحقق غير صحيح، يرجى التأكد وإعادة المحاولة' });
   }
 
@@ -487,12 +537,32 @@ authRouter.post('/verify-otp', (req: Request, res: Response) => {
   delete (user as any).verificationExpiresAt;
   db.upsertUser(user);
 
+  // Send Welcome Email once verified
+  EmailService.sendWelcomeEmail(user.email, user.name, 'ar').catch((err) => {
+    console.warn('[verify-otp] Could not dispatch welcome email:', err);
+  });
+
   return res.json({
     success: true,
-    message: 'تم التحقق من بريدك الإلكتروني بنجاح وتوثيق الحساب ✨',
-    isEmailVerified: true,
+    message: 'تم التحقق من بريدك الإلكتروني بنجاح وتفعيل الحساب! 🎉',
+    user: {
+      id: user.id,
+      accountId: user.id,
+      email: user.email,
+      username: user.username,
+      phone: user.phone,
+      name: user.name,
+      role: user.role,
+      profileData: user.profileData,
+      messagesData: user.messagesData,
+      itemsData: user.itemsData,
+    },
+    token: `token_${user.id}_${Date.now()}`,
   });
-});
+};
+
+authRouter.post('/verify-otp', handleVerifyOtp);
+authRouter.post('/auth/verify-otp', handleVerifyOtp);
 
 // GET /api/user/me
 authRouter.get('/user/me', (req: Request, res: Response) => {

@@ -21,7 +21,7 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginSuccess }) => {
-  const [mode, setMode] = useState<'login' | 'register' | 'recover' | 'reset'>('register');
+  const [mode, setMode] = useState<'login' | 'register' | 'recover' | 'reset' | 'verify-otp'>('register');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isNotFoundUser, setIsNotFoundUser] = useState(false);
@@ -32,6 +32,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [codeOrToken, setCodeOrToken] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [pendingUserId, setPendingUserId] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [phone, setPhone] = useState('');
@@ -39,6 +43,39 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
 
   const t = getTranslation(profile.language);
   const isArabic = profile.language === 'ar';
+
+  // Timer for OTP resend cooldown
+  React.useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/send-verification-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: pendingEmail || email || identifier,
+          userId: pendingUserId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'فشل إرسال رمز التحقق');
+      setSuccessMsg(data.message || 'تم إرسال رمز تحقق جديد إلى بريدك الإلكتروني بنجاح!');
+      setResendCooldown(60);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'فشل إعادة الإرسال');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSwitchToRegisterWithIdentifier = () => {
     setIsNotFoundUser(false);
@@ -77,11 +114,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'فشل إنشاء الحساب');
 
-        setSuccessMsg('تم إنشاء الحساب بنجاح وتفعيل المزامنة! جاري فتح حسابك...');
-        setTimeout(() => {
-          onLoginSuccess(data.user);
-          onClose();
-        }, 1200);
+        if (data.requiresVerification) {
+          setPendingEmail(data.email || email);
+          setPendingUserId(data.userId || '');
+          setSuccessMsg('تم إنشاء الحساب! تم إرسال رمز التحقق المكون من 6 أرقام إلى بريدك الإلكتروني لتأكيد ملكيته ✉️');
+          setMode('verify-otp');
+          setResendCooldown(60);
+        } else if (data.user) {
+          setSuccessMsg('تم إنشاء الحساب بنجاح وتفعيل المزامنة! جاري فتح حسابك...');
+          setTimeout(() => {
+            onLoginSuccess(data.user);
+            onClose();
+          }, 1200);
+        }
       } else if (mode === 'login') {
         const res = await fetch('/api/login', {
           method: 'POST',
@@ -100,11 +145,40 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
           throw new Error(data.error || 'فشل تسجيل الدخول');
         }
 
-        setSuccessMsg('تم تسجيل الدخول بنجاح!');
+        if (data.requiresVerification) {
+          setPendingEmail(data.email || email || identifier);
+          setPendingUserId(data.userId || '');
+          setSuccessMsg(data.message || 'بريدك الإلكتروني يحتاج إلى تفعيل. أدخل الرمز المرسل لإيميلك.');
+          setMode('verify-otp');
+          setResendCooldown(60);
+        } else if (data.user) {
+          setSuccessMsg('تم تسجيل الدخول بنجاح!');
+          setTimeout(() => {
+            onLoginSuccess(data.user);
+            onClose();
+          }, 1000);
+        }
+      } else if (mode === 'verify-otp') {
+        const res = await fetch('/api/verify-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: pendingEmail || email || identifier,
+            userId: pendingUserId,
+            code: otpCode,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'رمز التحقق غير صحيح');
+
+        setSuccessMsg('تم تأكيد بريدك الإلكتروني وتفعيل الحساب بنجاح! 🎉');
         setTimeout(() => {
-          onLoginSuccess(data.user);
+          if (data.user) {
+            onLoginSuccess(data.user);
+          }
           onClose();
-        }, 1000);
+        }, 1200);
       } else if (mode === 'recover') {
         const res = await fetch('/api/recover-password', {
           method: 'POST',
@@ -284,10 +358,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
         {/* Title Header */}
         <div className="text-center space-y-2 pt-2">
           <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-[var(--accent-sage)] text-white shadow-md">
-            <Sparkles className="w-6 h-6 animate-pulse" />
+            {mode === 'verify-otp' ? (
+              <Mail className="w-6 h-6 animate-bounce" />
+            ) : (
+              <Sparkles className="w-6 h-6 animate-pulse" />
+            )}
           </div>
           <h2 className="text-xl font-bold text-[var(--text-main)] tracking-tight">
-            {mode === 'register'
+            {mode === 'verify-otp'
+              ? isArabic
+                ? 'تأكيد بريدك الإلكتروني'
+                : 'Verify Your Email'
+              : mode === 'register'
               ? isArabic
                 ? 'إنشاء حساب جديد وتأمين بياناتك'
                 : 'Create Account & Save Data'
@@ -300,48 +382,54 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
               : 'Recover Password'}
           </h2>
           <p className="text-xs text-[var(--text-muted)] font-medium max-w-xs mx-auto">
-            {isArabic
+            {mode === 'verify-otp'
+              ? isArabic
+                ? `أدخل رمز التحقق المكون من 6 أرقام المرسل إلى (${pendingEmail || email || identifier})`
+                : `Enter the 6-digit code sent to (${pendingEmail || email || identifier})`
+              : isArabic
               ? 'احفظ جميع محادثاتك وملاحظاتك بأمان ومزامنتها عبر الأجهزة'
               : 'Securely sync your companion chats and memory across devices'}
           </p>
         </div>
 
-        {/* Mode Selector Tabs */}
-        <div className="grid grid-cols-2 p-1 bg-[var(--bg-hover)] rounded-2xl gap-1 text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => {
-              setMode('register');
-              setError(null);
-              setSuccessMsg(null);
-            }}
-            className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-              mode === 'register'
-                ? 'bg-[var(--bg-surface)] text-[var(--accent-sage)] shadow-sm font-extrabold'
-                : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
-            }`}
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>{isArabic ? 'إنشاء حساب' : 'Sign Up'}</span>
-          </button>
+        {/* Mode Selector Tabs (Hidden when verifying OTP) */}
+        {mode !== 'verify-otp' && (
+          <div className="grid grid-cols-2 p-1 bg-[var(--bg-hover)] rounded-2xl gap-1 text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => {
+                setMode('register');
+                setError(null);
+                setSuccessMsg(null);
+              }}
+              className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                mode === 'register'
+                  ? 'bg-[var(--bg-surface)] text-[var(--accent-sage)] shadow-sm font-extrabold'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+              }`}
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>{isArabic ? 'إنشاء حساب' : 'Sign Up'}</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setMode('login');
-              setError(null);
-              setSuccessMsg(null);
-            }}
-            className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-              mode === 'login'
-                ? 'bg-[var(--bg-surface)] text-[var(--accent-sage)] shadow-sm font-extrabold'
-                : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
-            }`}
-          >
-            <LogIn className="w-4 h-4" />
-            <span>{isArabic ? 'تسجيل الدخول' : 'Login'}</span>
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('login');
+                setError(null);
+                setSuccessMsg(null);
+              }}
+              className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                mode === 'login'
+                  ? 'bg-[var(--bg-surface)] text-[var(--accent-sage)] shadow-sm font-extrabold'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+              }`}
+            >
+              <LogIn className="w-4 h-4" />
+              <span>{isArabic ? 'تسجيل الدخول' : 'Login'}</span>
+            </button>
+          </div>
+        )}
 
         {isNotFoundUser && (
           <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-700 dark:text-amber-300 text-xs space-y-2 animate-fade-in">
@@ -536,6 +624,54 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
             </div>
           )}
 
+          {mode === 'verify-otp' && (
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="font-bold text-[var(--text-muted)] uppercase">
+                  {isArabic ? 'رمز التحقق (OTP)' : 'Verification Code'}
+                </label>
+                <input
+                  type="text"
+                  required
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value)}
+                  placeholder="123456"
+                  className="w-full px-4 py-3 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] font-mono text-center text-xl font-black tracking-widest focus:outline-none focus:ring-2 focus:ring-[var(--accent-sage)] shadow-inner"
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-xs pt-1">
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={resendCooldown > 0 || loading}
+                  className="text-[var(--accent-sage)] font-bold hover:underline disabled:opacity-50 flex items-center gap-1"
+                >
+                  {resendCooldown > 0
+                    ? isArabic
+                      ? `إعادة الإرسال بعد (${resendCooldown} ثانية)`
+                      : `Resend in (${resendCooldown}s)`
+                    : isArabic
+                    ? '🔄 إعادة إرسال رمز جديد'
+                    : '🔄 Resend new code'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('register');
+                    setError(null);
+                    setSuccessMsg(null);
+                  }}
+                  className="text-[var(--text-muted)] hover:text-[var(--text-main)] font-medium underline"
+                >
+                  {isArabic ? 'تغيير البريد' : 'Change Email'}
+                </button>
+              </div>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={loading}
@@ -545,7 +681,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
               <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
             ) : (
               <>
-                {mode === 'register' ? (
+                {mode === 'verify-otp' ? (
+                  <ShieldCheck className="w-4 h-4" />
+                ) : mode === 'register' ? (
                   <UserPlus className="w-4 h-4" />
                 ) : mode === 'login' ? (
                   <LogIn className="w-4 h-4" />
@@ -553,7 +691,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ profile, onClose, onLoginS
                   <KeyRound className="w-4 h-4" />
                 )}
                 <span>
-                  {mode === 'register'
+                  {mode === 'verify-otp'
+                    ? isArabic
+                      ? 'تأكيد وتفعيل الحساب'
+                      : 'Verify & Activate Account'
+                    : mode === 'register'
                     ? isArabic
                       ? 'إنشاء وتأكيد الحساب'
                       : 'Create Account'

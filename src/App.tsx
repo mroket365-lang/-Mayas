@@ -18,6 +18,7 @@ import { SubscriptionModal } from './components/SubscriptionModal';
 import { StatsModal } from './components/StatsModal';
 import { MaritalCounselingModal } from './components/MaritalCounselingModal';
 import { AuthModal } from './components/AuthModal';
+import { DailyCheckInModal } from './components/DailyCheckInModal';
 import { AdminPanel } from './admin/AdminPanel';
 import { realtimeClient } from './services/realtimeClient';
 
@@ -53,6 +54,7 @@ export default function App() {
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isMaritalSupportOpen, setIsMaritalSupportOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isDailyCheckInOpen, setIsDailyCheckInOpen] = useState(false);
   const [ringingAlarm, setRingingAlarm] = useState<CompanionItem | null>(null);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [dailyReviewText, setDailyReviewText] = useState<string>('');
@@ -533,6 +535,7 @@ export default function App() {
               onOpenSubscription={() => setIsSubscriptionOpen(true)}
               onOpenAuth={() => setIsAuthOpen(true)}
               onLogout={handleLogout}
+              onOpenDailyCheckIn={() => setIsDailyCheckInOpen(true)}
             />
           </div>
         )}
@@ -669,6 +672,26 @@ export default function App() {
         <PermissionsModal
           profile={profile}
           onClose={() => setIsPermissionsOpen(false)}
+        />
+      )}
+
+      {isDailyCheckInOpen && (
+        <DailyCheckInModal
+          isOpen={isDailyCheckInOpen}
+          onClose={() => setIsDailyCheckInOpen(false)}
+          profile={profile}
+          items={items}
+          onSaveCheckIn={(checkIn) => {
+            storageService.saveDailyCheckIn(checkIn);
+            // Refresh streak in profile
+            const stats = storageService.getCheckInStats();
+            handleUpdateProfile({
+              ...profile,
+              checkInStreak: stats.streak,
+            });
+            setIsDailyCheckInOpen(false);
+          }}
+          existingTodayCheckIn={storageService.getTodayCheckIn()}
         />
       )}
 

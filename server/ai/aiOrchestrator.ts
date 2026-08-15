@@ -54,6 +54,50 @@ function generateSmartFallbackReply(
     return { replyText, createdOrUpdatedItems, actions };
   }
 
+  // Quick Goal / Plan creation fallback
+  const goalMatch = cleanMsg.match(/(?:هدف|خطة|خطتي|هدف جديد|أهدف|goal|plan|my goal is)\s+(.+)/i);
+  if (goalMatch && goalMatch[1]) {
+    const rawGoal = goalMatch[1].trim();
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 30);
+    const endDateStr = futureDate.toISOString().split('T')[0];
+
+    const newGoalItem: CompanionItem = {
+      id: 'item_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      userId: profile.id || 'user_default_01',
+      type: 'goal',
+      title: rawGoal.length > 50 ? rawGoal.substring(0, 50) + '...' : rawGoal,
+      description: `خطة وإنجاز تم إنشاؤها عبر الرفيق: "${rawGoal}"`,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      startDate: currentDateStr,
+      endDate: endDateStr,
+      dueDate: endDateStr,
+      priority: 'high',
+      progressPercent: 0,
+      milestones: [
+        { id: 'm_' + Date.now() + '_1', title: isArabic ? 'المرحلة 1: الانطلاق والتخطيط الأول' : 'Phase 1: Setup & Planning', completed: false },
+        { id: 'm_' + Date.now() + '_2', title: isArabic ? 'المرحلة 2: تنفيذ خطوات العمل الرئيسية' : 'Phase 2: Execution & Progress', completed: false },
+        { id: 'm_' + Date.now() + '_3', title: isArabic ? 'المرحلة 3: مراجعة الإنجاز والوصول للهدف' : 'Phase 3: Final Goal Achievement', completed: false },
+      ],
+    };
+    createdOrUpdatedItems.push(newGoalItem);
+    actions.push({
+      type: 'created',
+      itemType: 'goal',
+      title: newGoalItem.title,
+      details: isArabic ? `تمت إضافة الهدف والخطة: "${newGoalItem.title}"` : `Added Goal ${newGoalItem.title}`,
+      itemId: newGoalItem.id,
+    });
+
+    const replyText = (isArabic
+      ? `تم إنشاء وتوثيق هدفك والخطة الزمانية "${newGoalItem.title}" بنجاح 🎯! تم تحديد المراحل والتقدم الأولي، يمكنك متابعتها الآن من قائمة المحفوظات ✨`
+      : `Created your goal plan "${newGoalItem.title}" 🎯! Milestones and timeline set up in your Saved Goals view ✨`) + tempNotice;
+
+    return { replyText, createdOrUpdatedItems, actions };
+  }
+
   // Quick Task / Reminder creation fallback
   const reminderMatch = cleanMsg.match(/(?:ذكرني|سجل|أضف|اضف|مهمة جديدة|موعد|remind me to|add task)\s+(.+)/i);
   if (reminderMatch && reminderMatch[1]) {

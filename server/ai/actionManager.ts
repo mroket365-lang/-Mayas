@@ -38,6 +38,18 @@ export function validateAndExecuteActions(
         })
         .filter((st: { title: string }) => st.title.length > 0);
 
+      const rawMilestones = Array.isArray(args.milestones) ? args.milestones : [];
+      const parsedMilestones = rawMilestones
+        .map((m: any, idx: number) => {
+          const mTitle = typeof m === 'string' ? m : m?.title || m?.name || '';
+          return {
+            id: 'm_' + Date.now() + '_' + idx,
+            title: String(mTitle).trim(),
+            completed: false,
+          };
+        })
+        .filter((m: { title: string }) => m.title.length > 0);
+
       const newItem: CompanionItem = {
         id: 'item_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
         userId: 'user_local',
@@ -47,14 +59,24 @@ export function validateAndExecuteActions(
         status: 'pending',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        dueDate: args.dueDate || currentDateStr,
+        dueDate: args.dueDate || args.endDate || currentDateStr,
         dueTime: args.dueTime || undefined,
         location: args.location || undefined,
         person: args.person || undefined,
         priority: (args.priority as CompanionItem['priority']) || 'medium',
         repeatRule: (args.repeatRule as CompanionItem['repeatRule']) || 'none',
         subtasks: parsedSubtasks.length > 0 ? parsedSubtasks : undefined,
-        progressPercent: 0,
+        progressPercent: args.targetValue && args.targetValue > 0 ? 0 : 0,
+        // Long notes & Goal fields
+        startDate: args.startDate || currentDateStr,
+        endDate: args.endDate || args.dueDate || undefined,
+        targetGoal: args.targetGoal || args.description || undefined,
+        targetMetric: args.targetMetric || undefined,
+        targetValue: typeof args.targetValue === 'number' ? args.targetValue : undefined,
+        currentValue: 0,
+        milestones: parsedMilestones.length > 0 ? parsedMilestones : undefined,
+        imageUrl: args.imageUrl || undefined,
+        isLongNote: args.isLongNote || args.type === 'note' || undefined,
       };
 
       createdOrUpdatedItems.push(newItem);

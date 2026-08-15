@@ -62,6 +62,39 @@ export const geminiToolDeclarations: FunctionDeclaration[] = [
           items: { type: Type.STRING },
           description: 'Optional array of subtask titles or decomposed steps for complex tasks (e.g., ["كتابة النص", "التصوير", "المونتاج"]).',
         },
+        startDate: {
+          type: Type.STRING,
+          description: 'Start date formatted as YYYY-MM-DD for strategic goals or plans.',
+        },
+        endDate: {
+          type: Type.STRING,
+          description: 'Target end date formatted as YYYY-MM-DD for strategic goals or plans.',
+        },
+        targetGoal: {
+          type: Type.STRING,
+          description: 'Detailed strategy, goal motivation, or target purpose.',
+        },
+        targetMetric: {
+          type: Type.STRING,
+          description: 'Unit of measurement for the goal (e.g. متابع, كتاب, ريال, %)',
+        },
+        targetValue: {
+          type: Type.NUMBER,
+          description: 'Numeric target objective to reach (e.g., 1000)',
+        },
+        milestones: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: 'Array of sequential phase titles or milestone steps for the goal plan.',
+        },
+        imageUrl: {
+          type: Type.STRING,
+          description: 'Image URL or attached media link for long notes.',
+        },
+        isLongNote: {
+          type: Type.BOOLEAN,
+          description: 'True if the item is a long note, poem, excerpt, or article.',
+        },
       },
       required: ['type', 'title'],
     },

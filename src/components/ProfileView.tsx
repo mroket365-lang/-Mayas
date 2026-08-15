@@ -67,6 +67,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onOpenSubscription,
   onOpenAuth,
   onLogout,
+  onOpenDailyCheckIn,
 }) => {
   const isArabic = profile.language === 'ar';
   const t = getTranslation(profile.language);
@@ -380,23 +381,23 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         <div className="p-5 sm:p-6 rounded-3xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-sm space-y-5">
           {/* Top User Info Section */}
           <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4">
-            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-start">
+            <div className="flex items-center sm:items-start gap-3.5 sm:gap-4 text-start w-full sm:w-auto">
               {/* Avatar */}
-              <div className="relative">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-tr from-[var(--accent-sage)] to-emerald-600 text-white flex items-center justify-center font-black text-2xl sm:text-3xl shadow-md">
+              <div className="relative shrink-0">
+                <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-gradient-to-tr from-[var(--accent-sage)] to-emerald-600 text-white flex items-center justify-center font-black text-xl sm:text-3xl shadow-md">
                   {(profile.displayName || profile.addressAs || 'ر').charAt(0).toUpperCase()}
                 </div>
-                <div className="absolute -bottom-1 -right-1 p-1 bg-emerald-500 text-white rounded-full border-2 border-[var(--bg-surface)] shadow" title={isArabic ? 'متصل ونشط' : 'Online'}>
-                  <CheckCircle2 className="w-3.5 h-3.5" />
+                <div className="absolute -bottom-0.5 -end-0.5 p-1 bg-emerald-500 text-white rounded-full border-2 border-[var(--bg-surface)] shadow" title={isArabic ? 'متصل ونشط' : 'Online'}>
+                  <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 </div>
               </div>
 
               {/* Name & Details */}
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+              <div className="space-y-1 min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
                   {!isEditingName ? (
                     <>
-                      <h2 className="text-lg sm:text-xl font-black text-[var(--text-main)]">
+                      <h2 className="text-base sm:text-xl font-black text-[var(--text-main)] truncate">
                         {profile.displayName || profile.addressAs || (profile.email ? profile.email.split('@')[0] : 'مستخدم الرفيق')}
                       </h2>
                       <button
@@ -404,33 +405,33 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                           setEditNameValue(profile.displayName || profile.addressAs || '');
                           setIsEditingName(true);
                         }}
-                        className="p-1 text-[var(--text-muted)] hover:text-[var(--accent-sage)] rounded-lg transition-all"
+                        className="p-1 text-[var(--text-muted)] hover:text-[var(--accent-sage)] rounded-lg transition-all shrink-0"
                         title={isArabic ? 'تعديل الاسم' : 'Edit name'}
                       >
                         <Edit3 className="w-4 h-4" />
                       </button>
                     </>
                   ) : (
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 w-full">
                       <input
                         type="text"
                         value={editNameValue}
                         onChange={(e) => setEditNameValue(e.target.value)}
                         placeholder={isArabic ? 'الاسم' : 'Name'}
-                        className="px-3 py-1.5 text-xs font-bold rounded-xl border border-[var(--accent-sage)] bg-[var(--bg-main)] text-[var(--text-main)] focus:outline-none ring-1 ring-[var(--accent-sage)]"
+                        className="px-3 py-1.5 text-xs font-bold rounded-xl border border-[var(--accent-sage)] bg-[var(--bg-main)] text-[var(--text-main)] focus:outline-none ring-1 ring-[var(--accent-sage)] flex-1 min-w-[120px]"
                         autoFocus
                       />
                       <button
                         onClick={handleSaveName}
                         disabled={isSavingName}
-                        className="p-1.5 bg-[var(--accent-sage)] text-white rounded-xl text-xs font-bold flex items-center gap-1 hover:opacity-90 shadow-sm"
+                        className="p-1.5 px-3 bg-[var(--accent-sage)] text-white rounded-xl text-xs font-bold flex items-center gap-1 hover:opacity-90 shadow-sm shrink-0"
                       >
                         <Save className="w-3.5 h-3.5" />
                         <span>{isArabic ? 'حفظ' : 'Save'}</span>
                       </button>
                       <button
                         onClick={() => setIsEditingName(false)}
-                        className="px-2 py-1.5 border border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] rounded-xl text-xs"
+                        className="px-2.5 py-1.5 border border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] rounded-xl text-xs shrink-0"
                       >
                         {isArabic ? 'إلغاء' : 'Cancel'}
                       </button>
@@ -438,14 +439,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   )}
 
                   {/* Plan Badge */}
-                  <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                  <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1 shrink-0">
                     <Crown className="w-3 h-3 text-amber-500" />
                     <span>{planInfo?.name || 'Free Plan'}</span>
                   </span>
                 </div>
 
                 {/* Email and Verification */}
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-xs text-[var(--text-muted)] pt-0.5">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)] pt-0.5">
                   <div className="flex items-center gap-1">
                     <Mail className="w-3.5 h-3.5 text-[var(--text-muted)]" />
                     <span className="font-mono text-[var(--text-main)]">{profile.email || 'user@rafiq.local'}</span>
@@ -659,6 +660,42 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* 2.8 Daily Check-in & Mood Tracker Streak Card */}
+      {onOpenDailyCheckIn && (
+        <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-indigo-500/10 border border-[var(--border-color)] shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 rounded-2xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
+              <Flame className="w-6 h-6 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm sm:text-base font-black text-[var(--text-main)]">
+                  {isArabic ? 'التقييم اليومي وسلسلة المتابعة' : 'Daily Check-in & Mood Tracker'}
+                </h3>
+                {(profile.checkInStreak || 0) > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                    🔥 {profile.checkInStreak} {isArabic ? 'يوم متتالي' : 'day streak'}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[var(--text-muted)] font-medium mt-0.5">
+                {isArabic
+                  ? 'سجّل مزاجك، وطاقتك، والعادات التي أنجزتها اليوم لتعزيز إنجازاتك وسلسلة التزامك'
+                  : 'Track your daily mood, energy level, and habit streak with your companion'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={onOpenDailyCheckIn}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-extrabold text-xs shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 shrink-0"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>{isArabic ? 'بدء التقييم اليومي' : 'Start Daily Check-in'}</span>
+          </button>
+        </div>
+      )}
 
       {/* 3. AI & Resource Consumption Statistics Card (1 point = 5 tokens) */}
       <div className="p-4 sm:p-5 rounded-3xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-sm space-y-3">

@@ -170,12 +170,12 @@ export const TodayView: React.FC<TodayViewProps> = ({
     <div className="max-w-2xl mx-auto p-4 space-y-6 pb-24">
       {/* Top Banner Greeting & Performance Summary */}
       <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-[var(--accent-sage)] to-teal-800 text-white shadow-md space-y-3 relative overflow-hidden">
-        <div className="flex items-center justify-between relative z-10">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-lg sm:text-xl font-bold flex items-center gap-1.5 truncate">
-              <span>{greetingText} {profile.addressAs}</span>
+        <div className="flex items-center justify-between gap-2 sm:gap-3 relative z-10">
+          <div className="min-w-0 flex-1 me-1">
+            <h2 className="text-base sm:text-xl font-bold flex items-center gap-1.5 truncate leading-tight">
+              <span className="truncate">{greetingText} {profile.addressAs}</span>
             </h2>
-            <p className="text-[11px] sm:text-xs text-emerald-100 font-medium mt-0.5">
+            <p className="text-[11px] sm:text-xs text-emerald-100 font-medium mt-0.5 truncate">
               {new Date().toLocaleDateString(profile.language === 'ar' ? 'ar-SA' : 'en-US', {
                 weekday: 'long',
                 month: 'short',

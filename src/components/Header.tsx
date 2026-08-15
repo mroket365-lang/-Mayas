@@ -98,21 +98,21 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Right / End: Streamlined Controls */}
-      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
         {/* Guest Auth Action or Pro Subscription Button */}
         {!isLoggedIn && onOpenAuth ? (
           <button
             onClick={onOpenAuth}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs shadow-md shadow-emerald-600/20 transition-all hover:scale-105 active:scale-95 shrink-0"
+            className="flex items-center gap-1 sm:gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-[11px] sm:text-xs shadow-md shadow-emerald-600/20 transition-all hover:scale-105 active:scale-95 shrink-0"
             title={isArabic ? 'تسجيل الدخول / إنشاء حساب' : 'Log In / Sign Up'}
           >
             <LogIn className="w-3.5 h-3.5 shrink-0" />
-            <span className="whitespace-nowrap">{isArabic ? 'دخول / تسجيل' : 'Login / Sign Up'}</span>
+            <span className="whitespace-nowrap">{isArabic ? 'دخول / تسجيل' : 'Login'}</span>
           </button>
         ) : onOpenSubscription ? (
           <button
             onClick={onOpenSubscription}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-500 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold text-xs shadow-md shadow-amber-500/20 transition-all hover:scale-105 active:scale-95 shrink-0"
+            className="flex items-center gap-1 sm:gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-500 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold text-[11px] sm:text-xs shadow-md shadow-amber-500/20 transition-all hover:scale-105 active:scale-95 shrink-0"
             title={isArabic ? 'ترقية الاشتراك إلى الخطة المتقدمة' : 'Upgrade to Pro Subscription'}
           >
             <Crown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-100 animate-pulse shrink-0" />
@@ -124,29 +124,29 @@ export const Header: React.FC<HeaderProps> = ({
         {onOpenStats && (
           <button
             onClick={onOpenStats}
-            className="p-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--accent-sage)] transition-all flex items-center gap-1 font-bold text-xs"
+            className="p-1.5 sm:p-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--accent-sage)] transition-all flex items-center gap-1 font-bold text-xs"
             title={isArabic ? 'إحصائيات الاستهلاك والإنجاز' : 'Usage & Stats'}
           >
-            <BarChart3 className="w-4 h-4" />
-            <span className="hidden md:inline">{isArabic ? 'الإحصائيات' : 'Stats'}</span>
+            <BarChart3 className="w-4 h-4 shrink-0" />
+            <span className="hidden md:inline whitespace-nowrap">{isArabic ? 'الإحصائيات' : 'Stats'}</span>
           </button>
         )}
 
-        {/* 2. Quick Tools Dropdown Menu (Consolidating Theme, Language, Candid Mode, Marital Support & Permissions) */}
+        {/* 2. Quick Tools Dropdown Menu */}
         <div className="relative" ref={toolsMenuRef}>
           <button
             onClick={() => setIsToolsMenuOpen(!isToolsMenuOpen)}
-            className={`p-2 rounded-xl border transition-all text-xs font-bold flex items-center gap-1.5 ${
+            className={`p-1.5 sm:p-2 rounded-xl border transition-all text-xs font-bold flex items-center gap-1 sm:gap-1.5 ${
               isToolsMenuOpen
                 ? 'bg-[var(--accent-sage)]/15 border-[var(--accent-sage)] text-[var(--accent-sage)]'
                 : 'border-[var(--border-color)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--text-main)]'
             }`}
             title={isArabic ? 'أدوات الوصول السريع والتفضيلات' : 'Quick Tools & Preferences'}
           >
-            <SlidersHorizontal className="w-4 h-4 text-[var(--accent-sage)]" />
-            <span className="hidden sm:inline font-semibold">{isArabic ? 'الأدوات' : 'Tools'}</span>
+            <SlidersHorizontal className="w-4 h-4 text-[var(--accent-sage)] shrink-0" />
+            <span className="hidden sm:inline font-semibold whitespace-nowrap">{isArabic ? 'الأدوات' : 'Tools'}</span>
             <ChevronDown
-              className={`w-3.5 h-3.5 text-[var(--text-muted)] transition-transform ${
+              className={`w-3.5 h-3.5 text-[var(--text-muted)] transition-transform shrink-0 ${
                 isToolsMenuOpen ? 'rotate-180' : ''
               }`}
             />
@@ -154,33 +154,42 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Quick Tools Dropdown Card */}
           {isToolsMenuOpen && (
-            <div className="absolute top-full mt-2 end-0 z-50 w-80 min-w-[18rem] max-w-[calc(100vw-1.5rem)] p-3.5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl space-y-3 animate-fade-in text-xs">
-              <div className="flex items-center justify-between pb-2 border-b border-[var(--border-color)]">
-                <span className="font-extrabold text-[var(--text-muted)] uppercase tracking-wider text-[10px] whitespace-nowrap">
-                  {isArabic ? 'أدوات الخيارات السريعة' : 'Quick Options'}
-                </span>
-                <button
-                  onClick={() => setIsToolsMenuOpen(false)}
-                  className="p-1 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+            <>
+              {/* Backdrop for mobile */}
+              <div
+                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs sm:hidden"
+                onClick={() => setIsToolsMenuOpen(false)}
+              />
+              <div className="fixed sm:absolute inset-x-3 sm:inset-auto top-14 sm:top-full sm:end-0 sm:mt-2 z-50 w-auto sm:w-84 max-w-full sm:max-w-xs p-4 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl space-y-3 animate-fade-in text-xs overflow-y-auto max-h-[85vh]">
+                <div className="flex items-center justify-between pb-2 border-b border-[var(--border-color)]">
+                  <span className="font-extrabold text-[var(--text-muted)] uppercase tracking-wider text-[10px] whitespace-nowrap">
+                    {isArabic ? 'أدوات الخيارات السريعة' : 'Quick Options'}
+                  </span>
+                  <button
+                    onClick={() => setIsToolsMenuOpen(false)}
+                    className="p-1 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
 
-              {/* Theme & Language Row */}
-              <div className="grid grid-cols-2 gap-2">
+              {/* Action Rows: Theme & Permissions */}
+              <div className="space-y-2">
                 {/* Theme Toggle */}
                 <button
                   onClick={toggleTheme}
-                  className="p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--text-main)] font-bold flex items-center justify-between transition-all"
+                  className="w-full p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--text-main)] font-bold flex items-center justify-between transition-all"
                 >
-                  <span className="flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="flex items-center gap-2 min-w-0">
                     {profile.theme === 'dark' ? (
                       <Sun className="w-4 h-4 text-amber-400 shrink-0" />
                     ) : (
                       <Moon className="w-4 h-4 text-slate-700 dark:text-slate-200 shrink-0" />
                     )}
-                    <span className="whitespace-nowrap">{profile.theme === 'dark' ? t.themeLight : t.themeDark}</span>
+                    <span className="truncate">{isArabic ? 'الوضع الليلي والداكن' : 'Night / Dark Mode'}</span>
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--accent-sage)]/20 text-[var(--accent-sage)] font-extrabold whitespace-nowrap shrink-0">
+                    {profile.theme === 'dark' ? (isArabic ? 'داكن 🌙' : 'Dark 🌙') : (isArabic ? 'فاتح ☀️' : 'Light ☀️')}
                   </span>
                 </button>
 
@@ -190,10 +199,15 @@ export const Header: React.FC<HeaderProps> = ({
                     setIsToolsMenuOpen(false);
                     onOpenPermissions();
                   }}
-                  className="p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--text-main)] font-bold flex items-center gap-1.5 transition-all"
+                  className="w-full p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--text-main)] font-bold flex items-center justify-between transition-all"
                 >
-                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span className="truncate whitespace-nowrap">{t.permissionsTitle}</span>
+                  <span className="flex items-center gap-2 min-w-0">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="truncate">{isArabic ? 'أذونات الميكروفون والوسائط' : 'Media & Mic Permissions'}</span>
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 font-extrabold whitespace-nowrap shrink-0">
+                    {isArabic ? 'إدارة' : 'Manage'}
+                  </span>
                 </button>
               </div>
 
@@ -262,22 +276,23 @@ export const Header: React.FC<HeaderProps> = ({
                     <HeartHandshake className="w-4 h-4 text-rose-500 animate-pulse shrink-0" />
                     <span className="whitespace-nowrap">{isArabic ? 'استشارة ودعم زوجي (18+)' : 'Marital Support (18+)'}</span>
                   </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-600 font-extrabold whitespace-nowrap">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-600 font-extrabold whitespace-nowrap shrink-0">
                     {isArabic ? 'جلسة' : 'Session'}
                   </span>
                 </button>
               )}
             </div>
+          </>
           )}
         </div>
 
         {/* 3. Settings Modal Trigger Icon */}
         <button
           onClick={onOpenSettings}
-          className="p-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--text-main)] transition-all"
+          className="p-1.5 sm:p-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--text-main)] transition-all shrink-0"
           title={t.settings}
         >
-          <Settings className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-muted)] hover:text-[var(--text-main)]" />
+          <Settings className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--text-muted)] hover:text-[var(--text-main)] shrink-0" />
         </button>
       </div>
     </header>

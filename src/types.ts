@@ -34,6 +34,25 @@ export interface SubTask {
   createdAt?: string;
 }
 
+export interface GoalMilestone {
+  id: string;
+  title: string;
+  targetValue?: number;
+  currentValue?: number;
+  completed: boolean;
+  startDate?: string;
+  endDate?: string;
+  note?: string;
+}
+
+export interface GoalAIAnalysis {
+  percentage: number;
+  status: 'excellent' | 'good' | 'behind' | 'critical';
+  summary: string;
+  advice: string[];
+  analyzedAt: string;
+}
+
 export interface CompanionItem {
   id: string;
   userId: string;
@@ -60,6 +79,19 @@ export interface CompanionItem {
   completedAt?: string;
   subtasks?: SubTask[];
   progressPercent?: number; // 0 to 100
+  // Long Notes fields
+  imageUrl?: string;
+  isLongNote?: boolean;
+  noteCategory?: 'poetry' | 'snippet' | 'general' | 'draft' | 'long_note';
+  // Goal & Plan fields
+  startDate?: string;
+  endDate?: string;
+  targetGoal?: string;
+  targetMetric?: string;
+  targetValue?: number;
+  currentValue?: number;
+  milestones?: GoalMilestone[];
+  aiAnalysis?: GoalAIAnalysis;
 }
 
 export interface ChatMessage {

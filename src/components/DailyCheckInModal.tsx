@@ -116,6 +116,11 @@ const DEFAULT_SUGGESTED_HABITS = [
   { id: 'hab_sleep', titleAr: 'نوم مبكر وكافي 🌙', titleEn: 'Adequate Sleep 🌙' }
 ];
 
+interface HabitStatusItem {
+  title: string;
+  completed: boolean;
+}
+
 export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
   isOpen,
   onClose,
@@ -141,7 +146,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
 
   // Habits State
   const userHabits = items.filter(i => i.type === 'habit');
-  const [habitStatuses, setHabitStatuses] = useState<Record<string, { title: string; completed: boolean }>>({});
+  const [habitStatuses, setHabitStatuses] = useState<Record<string, HabitStatusItem>>({});
 
   // Submission / Celebration feedback state
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -303,7 +308,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
     const todayStr = now.toISOString().split('T')[0];
     const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
-    const habitsSummary: HabitCheckInStatus[] = Object.entries(habitStatuses).map(([habitId, h]) => ({
+    const habitsSummary: HabitCheckInStatus[] = Object.entries(habitStatuses).map(([habitId, h]: [string, HabitStatusItem]) => ({
       habitId,
       habitTitle: h.title,
       completed: h.completed
@@ -339,7 +344,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
     }
   };
 
-  const completedHabitsCount = Object.values(habitStatuses).filter(h => h.completed).length;
+  const completedHabitsCount = Object.values(habitStatuses).filter((h: HabitStatusItem) => h.completed).length;
   const totalHabitsCount = Object.keys(habitStatuses).length;
 
   return (
@@ -489,7 +494,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
                 </div>
 
                 <div className="space-y-1.5">
-                  {Object.entries(habitStatuses).map(([id, habit]) => {
+                  {Object.entries(habitStatuses).map(([id, habit]: [string, HabitStatusItem]) => {
                     const isDone = habit.completed;
                     return (
                       <button

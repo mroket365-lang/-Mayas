@@ -16,6 +16,7 @@ import {
   CheckSquare,
   Square,
   Loader2,
+  Target,
 } from 'lucide-react';
 import { getTranslation } from '../locales/translations';
 
@@ -42,10 +43,16 @@ export const TaskItemCard: React.FC<TaskItemCardProps> = ({
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
 
   const isCompleted = item.status === 'completed' || item.status === 'completed_late';
+  const milestones = item.milestones || [];
+  const completedMilestonesCount = milestones.filter((m) => m.completed).length;
+
   const subtasks = item.subtasks || [];
   const completedSubtasksCount = subtasks.filter((st) => st.completed).length;
+
   const currentProgress =
-    subtasks.length > 0
+    milestones.length > 0
+      ? Math.round((completedMilestonesCount / milestones.length) * 100)
+      : subtasks.length > 0
       ? Math.round((completedSubtasksCount / subtasks.length) * 100)
       : item.progressPercent || (isCompleted ? 100 : 0);
 
@@ -54,11 +61,19 @@ export const TaskItemCard: React.FC<TaskItemCardProps> = ({
     const nextCompleted = !isCompleted;
     const newStatus: TaskStatus = nextCompleted ? 'completed' : 'pending';
     
-    // Also toggle subtasks if all are being marked complete/pending
+    // Also toggle subtasks & milestones if all are being marked complete/pending
     let updatedSubtasks = subtasks;
     if (subtasks.length > 0) {
       updatedSubtasks = subtasks.map((st) => ({
         ...st,
+        completed: nextCompleted,
+      }));
+    }
+
+    let updatedMilestones = milestones;
+    if (milestones.length > 0) {
+      updatedMilestones = milestones.map((m) => ({
+        ...m,
         completed: nextCompleted,
       }));
     }
@@ -68,7 +83,26 @@ export const TaskItemCard: React.FC<TaskItemCardProps> = ({
       status: newStatus,
       progressPercent: nextCompleted ? 100 : 0,
       subtasks: updatedSubtasks,
+      milestones: updatedMilestones,
       completedAt: nextCompleted ? new Date().toISOString() : undefined,
+    });
+  };
+
+  // Toggle milestone step
+  const handleToggleMilestone = (mId: string) => {
+    const updatedMilestones = milestones.map((m) =>
+      m.id === mId ? { ...m, completed: !m.completed } : m
+    );
+    const newCompletedCount = updatedMilestones.filter((m) => m.completed).length;
+    const newPercent = Math.round((newCompletedCount / updatedMilestones.length) * 100);
+    const allDone = updatedMilestones.length > 0 && newCompletedCount === updatedMilestones.length;
+
+    onUpdateItem({
+      ...item,
+      milestones: updatedMilestones,
+      progressPercent: newPercent,
+      status: allDone ? 'completed' : item.status === 'completed' ? 'pending' : item.status,
+      completedAt: allDone ? new Date().toISOString() : undefined,
     });
   };
 
@@ -225,6 +259,18 @@ export const TaskItemCard: React.FC<TaskItemCardProps> = ({
               <span className="truncate max-w-[200px] sm:max-w-xs">{item.description}</span>
             ) : null}
 
+            {item.type === 'goal' && item.targetValue ? (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-500/15 text-amber-600 border border-amber-500/30 shrink-0">
+                🎯 {item.currentValue || 0} / {item.targetValue} {item.targetMetric || ''}
+              </span>
+            ) : null}
+
+            {item.isLongNote && item.imageUrl ? (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-teal-500/15 text-teal-600 border border-teal-500/30 shrink-0">
+                📷 صورة مرفقة
+              </span>
+            ) : null}
+
             {item.dueDate && (
               <span className="inline-flex items-center gap-0.5 shrink-0">
                 <Calendar className="w-3 h-3 text-[var(--accent-sage)]" />
@@ -252,6 +298,30 @@ export const TaskItemCard: React.FC<TaskItemCardProps> = ({
               </span>
             )}
           </div>
+
+          {/* Visual Progress Bar for Goal Item in main view */}
+          {item.type === 'goal' && (
+            <div className="w-full mt-2.5 space-y-1 pt-1 border-t border-[var(--border-color)]/50">
+              <div className="flex items-center justify-between text-[11px] font-bold text-[var(--text-muted)]">
+                <span className="flex items-center gap-1">
+                  🎯 {isArabic ? 'تقدم الخطة والهدف:' : 'Goal Progress:'}
+                </span>
+                <span className="font-mono text-xs text-[var(--accent-sage)] font-extrabold">{currentProgress}%</span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-[var(--bg-hover)] overflow-hidden border border-[var(--border-color)]/60">
+                <div
+                  className="h-full bg-gradient-to-r from-amber-500 via-emerald-500 to-[var(--accent-sage)] rounded-full transition-all duration-300 shadow-sm"
+                  style={{ width: `${currentProgress}%` }}
+                />
+              </div>
+              {(item.startDate || item.endDate) && (
+                <div className="flex justify-between items-center text-[10px] text-[var(--text-muted)] font-medium pt-0.5">
+                  <span>🗓️ {isArabic ? 'البداية:' : 'Start:'} {item.startDate || item.createdAt?.split('T')[0]}</span>
+                  <span>🏁 {isArabic ? 'الهدف:' : 'End:'} {item.endDate || item.dueDate}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 3. END: Progress Pill, Action Icons & Expand Chevron */}
@@ -316,6 +386,36 @@ export const TaskItemCard: React.FC<TaskItemCardProps> = ({
       {/* EXPANDED SUBTASK & PROGRESS PANEL (Progressive Disclosure) */}
       {isExpanded && (
         <div className="px-3 pb-3 sm:px-4 sm:pb-4 pt-1 space-y-3 border-t border-[var(--border-color)]/60 bg-[var(--bg-main)]/50 rounded-b-2xl animate-fade-in text-xs">
+          {/* Note Image Attachment Display */}
+          {item.imageUrl && (
+            <div className="rounded-2xl overflow-hidden border border-[var(--border-color)] bg-[var(--bg-surface)] max-h-64 sm:max-h-80 shadow-sm">
+              <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover rounded-2xl" />
+            </div>
+          )}
+
+          {/* Goal Metrics & Timeline Overview */}
+          {item.type === 'goal' && (
+            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-2">
+              <div className="flex justify-between items-center text-xs font-bold text-amber-800 dark:text-amber-300">
+                <span>🎯 المستهدف: {item.currentValue || 0} من أصل {item.targetValue || 100} {item.targetMetric || ''}</span>
+                <span className="font-mono text-sm">{currentProgress}%</span>
+              </div>
+              {item.startDate && item.endDate && (
+                <p className="text-[10px] text-[var(--text-muted)] font-medium">
+                  🗓️ النطاق الزمني للخطة: {item.startDate} ← إلى → {item.endDate}
+                </p>
+              )}
+              {item.aiAnalysis && (
+                <div className="p-2.5 rounded-xl bg-[var(--bg-surface)] border border-purple-500/20 text-[11px] space-y-1">
+                  <div className="font-bold text-purple-700 dark:text-purple-300">🧠 تقرير الذكاء الاصطناعي: {item.aiAnalysis.summary}</div>
+                  {item.aiAnalysis.advice?.map((adv, i) => (
+                    <div key={i} className="text-[10px] text-[var(--text-muted)]">• {adv}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Progress Bar & Quick Percentage Selector */}
           <div className="space-y-1.5 pt-1">
             <div className="flex items-center justify-between text-[11px] font-bold text-[var(--text-muted)]">
@@ -344,6 +444,41 @@ export const TaskItemCard: React.FC<TaskItemCardProps> = ({
               />
             </div>
           </div>
+
+          {/* Goal Milestones List if exists */}
+          {milestones.length > 0 && (
+            <div className="space-y-2 pt-1 border-t border-[var(--border-color)]/60">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-[var(--text-main)] flex items-center gap-1 text-[11px]">
+                  <Target className="w-3.5 h-3.5 text-amber-500" />
+                  <span>{isArabic ? 'مراحل الخطة والهدف' : 'Goal Milestones'} ({completedMilestonesCount}/{milestones.length})</span>
+                </span>
+              </div>
+
+              {milestones.map((m) => (
+                <div
+                  key={m.id}
+                  className={`flex items-center justify-between gap-2 p-2 rounded-xl border transition-colors ${
+                    m.completed
+                      ? 'border-emerald-500/20 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400 line-through'
+                      : 'border-amber-500/20 bg-amber-500/5 text-[var(--text-main)]'
+                  }`}
+                >
+                  <button
+                    onClick={() => handleToggleMilestone(m.id)}
+                    className="flex items-center gap-2 flex-1 text-right min-w-0"
+                  >
+                    {m.completed ? (
+                      <CheckSquare className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    ) : (
+                      <Square className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    )}
+                    <span className="truncate text-xs font-semibold">{m.title}</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Subtasks List */}
           <div className="space-y-2">

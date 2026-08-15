@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
-import { processCompanionChat, processCompanionChatStream, generateDailyReview, decomposeTaskWithAI } from './server/geminiService.js';
+import { processCompanionChat, processCompanionChatStream, generateDailyReview, decomposeTaskWithAI, analyzeGoalWithAI } from './server/geminiService.js';
 import { adminRouter } from './server/routes/adminRoutes.js';
 import { userSubscriptionRouter } from './server/routes/userSubscriptionRoutes.js';
 import { authRouter } from './server/routes/authRoutes.js';
@@ -219,6 +219,31 @@ async function startServer() {
     } catch (error: unknown) {
       console.error('Decompose task endpoint error:', error);
       const errMessage = error instanceof Error ? error.message : 'Failed to decompose task';
+      return res.status(500).json({ error: errMessage });
+    }
+  });
+
+  app.post('/api/companion/analyze-goal', async (req, res) => {
+    try {
+      const { title, targetGoal, startDate, endDate, targetMetric, targetValue, currentValue, milestones, language } = req.body;
+      if (!title) {
+        return res.status(400).json({ error: 'Goal title is required' });
+      }
+      const analysis = await analyzeGoalWithAI({
+        title,
+        targetGoal,
+        startDate,
+        endDate,
+        targetMetric,
+        targetValue,
+        currentValue,
+        milestones,
+        language,
+      });
+      return res.json({ analysis });
+    } catch (error: unknown) {
+      console.error('Analyze goal endpoint error:', error);
+      const errMessage = error instanceof Error ? error.message : 'Failed to analyze goal';
       return res.status(500).json({ error: errMessage });
     }
   });
