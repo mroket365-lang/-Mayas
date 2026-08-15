@@ -17,7 +17,7 @@
       "role": "user",
       "status": "active",
       "createdAt": "2026-08-15T10:50:22.227Z",
-      "lastActiveAt": "2026-08-15T15:17:59.456Z",
+      "lastActiveAt": "2026-08-15T15:24:06.790Z",
       "currency": "USD"
     },
     {
@@ -37,7 +37,7 @@
       "role": "user",
       "status": "active",
       "createdAt": "2026-08-15T14:05:49.025Z",
-      "lastActiveAt": "2026-08-15T15:17:54.501Z",
+      "lastActiveAt": "2026-08-15T15:22:23.788Z",
       "currency": "USD",
       "locale": "ar",
       "profileData": {
@@ -61,19 +61,6 @@
         "id": "USR-617648"
       },
       "messagesData": [
-        {
-          "id": "msg_1786751374760",
-          "sender": "user",
-          "text": "ساعديني كيف احصل على فت جوجل كلنت اي دي",
-          "timestamp": "2026-08-14T23:49:34.760Z"
-        },
-        {
-          "id": "msg_ai_1786751374765",
-          "sender": "ai",
-          "text": "أبشر يا موسى، ولا تشيل هم، سأشرح لك الخطوات ببساطة عشان تجيب الـ `VITE_GOOGLE_CLIENT_ID` من لوحة تحكم جوجل (Google Cloud Console):\n\n### الخطوات للحصول على الـ Client ID:\n\n1.  **ادخل على الرابط:** افتح [Google Cloud Console](https://console.cloud.google.com/).\n2.  **اختر مشروعك:** من القائمة العلوية بجانب شعار جوجل، تأكد أنك اخترت المشروع الخاص بتطبيقك.\n3.  **افتح القائمة الجانبية:** اضغط على الخطوط الثلاثة (القائمة) في أعلى اليمين.\n4.  **اذهب إلى APIs & Services:** اختر **APIs & Services** ثم اضغط على **Credentials**.\n5.  **ابحث عن OAuth 2.0 Client IDs:** ستجد قائمة تحت هذا العنوان. اضغط على اسم التطبيق الذي أنشأته مسبقاً (غالباً يكون اسمه \"Web client 1\").\n6.  **انسخ الـ Client ID:** ستفتح لك صفحة فيها بيانات التطبيق، ستجد في الأعلى خانة مكتوب فيها **Client ID**. هذا هو الرقم الطويل الذي ينتهي بـ `.apps.googleusercontent.com`.\n\n---\n\n### كيف تستخدمه في مشروعك؟\n\nبما أنك تستخدم `VITE` (وهذا يعني أنك تستخدم إطار عمل مثل React أو Vue)، يجب أن تضعه في ملف المتغيرات الخاص بك بهذا الشكل:\n\n1.  افتح ملف `.env` في مشروعك.\n2.  أضف السطر التالي:\n    `VITE_GOOGLE_CLIENT_ID=هنا_ضع_الرقم_الذي_نسخته`\n3.  **مهم جداً:** في منصة **Railway**، اذهب إلى إعدادات المشروع (Settings) ثم (Variables) وأضف نفس المتغير `VITE_GOOGLE_CLIENT_ID` بنفس القيمة هناك أيضاً، لكي يتعرف عليه السيرفر عند الرفع.\n\n**تذكير سريع يا موسى:**\n*   الـ `Client ID` هو الذي يبدأ بـ `VITE_`.\n*   الـ `Client Secret` (الذي حصلت عليه من نفس الصفحة في جوجل) **لا تضع قبله `VITE_`**، وضعه في Railway فقط ولا تضعه في ملفات الـ Frontend.\n\nهل واجهت أي صعوبة في الوصول لصفحة الـ Credentials؟ أنا معك يا موسى، خطوة بخطوة حتى يشتغل كل شيء تمام. ❤️",
-          "timestamp": "2026-08-14T23:49:39.662Z",
-          "actionsTaken": []
-        },
         {
           "id": "msg_1786751667790",
           "sender": "user",
@@ -803,6 +790,19 @@
           "text": "يا موسى، نظرة واحدة على الصورة وكشفت كل شيء! ممتاز إنك فتحت هذه الصفحة، وخليني أشرح لك عشان تتعلم وتصير محترف فيها للمستقبل! 🎓💡\n\n---\n\n### 🔍 وين المشكلة بالضبط؟\n\nشوف السطر حق:\n`GEMINI_API_KEY=\"AQ.Ab8RN6I8n2...\"`\n\n⚠️ **هذا المفتاح غير صالح (Invalid Key)!**\n* مفاتيح **Google Gemini API** الرسمية اللي تطلعها من [Google AI Studio](https://aistudio.google.com/) تبدأ دائماً بـ: **`AIzaSy...`**\n* المفتاح اللي أنت حاطه يبدأ بـ `AQ.` (وهذا غالباً رمز مؤقت أو توكن مختلف مش API Key حقيقي)، عشان كذا جوجل يرفضه ويعطيك `401 Unauthorized`.\n\n---\n\n### 🛠️ كيف تجيب المفتاح الصحيح بخطوات بسيطة؟\n\n1. ادخل على موقع **[aistudio.google.com](https://aistudio.google.com/)** وسجل دخول بحساب جوجل حقك.\n2. اضغط من القائمة الجانبية (أو من فوق) على زر **`Get API key`**.\n3. اضغط على **`Create API key`**.\n4. انسخ المفتاح الجديد اللي طلع لك (ستلاحظ أنه يبدأ بـ **`AIzaSy...`**).\n5. ارجع لشاشة Railway اللي في صورتك:\n   - احذف القيمة القديمة اللي تبدأ بـ `AQ.`\n   - الصق المفتاح الجديد مكانها.\n6. اضغط على الزر البنفسجي تحت: **`Update Variables`**.\n\n---\n\nبمجرد ما تضغط `Update Variables`، سيرفر Railway راح يعيد التشغيل تلقائياً، وجرب ترسل رسالة في الموقع... وراح يشتغل معك زي الطلقة بإذن الله! 🚀✨\n\nجربها الحين وطمني يا بطل! ❤️",
           "timestamp": "2026-08-15T15:17:03.051Z",
           "actionsTaken": []
+        },
+        {
+          "id": "msg_1786807219053",
+          "sender": "user",
+          "text": "ايوا بس من جوجل ستديو بفلوس صح يتطلب اشتراك\nهل ينفع اروح اسوي اي بي اي ثاني والا كيف",
+          "timestamp": "2026-08-15T15:20:19.053Z"
+        },
+        {
+          "id": "msg_ai_1786807219061",
+          "sender": "ai",
+          "text": "سؤال ممتاز ويدل على تفكيرك العملي يا موسى! 💡\n\nبخصوص **Google AI Studio**، الخبر الحلو هو: **لا، ليس بالضرورة أن تدفع!**\n\n### 1. هل هو بفلوس؟\n*   جوجل توفر **باقة مجانية (Free Tier)** سخية جداً للمطورين (مثل حالتك في مرحلة التطوير).\n*   طالما أنت في مرحلة بناء وتجربة \"مشروع رفيقي\"، الباقة المجانية ستكفيك وتزيد.\n*   **لكن:** الباقة المجانية لها \"حدود\" (Rate Limits) في عدد الطلبات في الدقيقة، وإذا تجاوزتها قد يتوقف الرد مؤقتاً، وهذا هو السبب اللي يخلينا نفكر في نموذج اشتراك مستقبلاً للمستخدمين النهائيين.\n\n### 2. هل ينفع تستخدم API ثاني؟\nنعم، طبعاً! تقدر تستخدم بدائل، لكن كل واحد له ميزاته وعيوبه:\n\n*   **OpenAI (ChatGPT API):** قوي جداً ومشهور، لكنه **ليس مجانياً** (يحتاج تشحن رصيد مسبقاً، مثلاً 5 دولار).\n*   **Groq API:** (أنصحك فيه بشدة!)\n    *   **ميزته:** سريع جداً بشكل خيالي، ويوفر باقة مجانية ممتازة جداً للمطورين.\n    *   **كيف تستخدمه؟** يدعم نماذج مثل `Llama 3` و `Mixtral`. إذا كان كودك مكتوب بـ `LangChain` أو مكتبة تدعم OpenAI-compatible API، فالتغيير سيكون مجرد تغيير \"رابط السيرفر\" (Base URL) ومفتاح الـ API.\n*   **Anthropic (Claude):** ذكي جداً، لكنه أيضاً مدفوع.\n\n---\n\n### 💡 نصيحتي لك يا موسى:\n\n1.  **استمر مع Google AI Studio (الباقة المجانية):** بما أنك بدأت فيه، كمل عليه. هو الأسهل حالياً ولا يحتاج منك دفع أي شيء الآن. فقط تأكد أنك تستخدم المفتاح الصحيح (الذي يبدأ بـ `AIzaSy`).\n2.  **لا تشغل بالك بالدفع الآن:** ركز على حل المشكلة التقنية وجعل \"مشروع رفيقي\" يعمل بشكل سليم. عندما يكتمل المشروع ويصبح جاهزاً للإطلاق، وقتها نفكر في \"نموذج الاشتراك\" (Subscription Model) الذي يغطي تكاليف الـ API ويحقق لك ربحاً.\n\n**الخلاصة:**\nالمشكلة عندك ليست في \"الاشتراك\"، المشكلة هي أن المفتاح الذي وضعته في Railway ليس مفتاح API حقيقي. \n\n**جرب الآن:**\nادخل على [Google AI Studio](https://aistudio.google.com/)، استخرج مفتاحاً جديداً (يبدأ بـ `AIzaSy`)، وضعه في Railway. إذا اشتغل، فأنت في السليم ولا تحتاج تدفع قرشاً واحداً الآن! 🚀\n\nهل تريدني أن أساعدك في معرفة كيف تغير الـ API Provider في الكود إذا قررت الانتقال لـ Groq مثلاً؟",
+          "timestamp": "2026-08-15T15:20:39.430Z",
+          "actionsTaken": []
         }
       ],
       "itemsData": [
@@ -1466,18 +1466,18 @@
       "userId": "user_default_01",
       "period": "2026-08",
       "feature": "ai_messages",
-      "count": 11,
+      "count": 15,
       "units": "requests",
-      "lastUsedAt": "2026-08-15T14:46:08.878Z"
+      "lastUsedAt": "2026-08-15T15:24:08.508Z"
     },
     {
       "id": "ur_nt3tdum",
       "userId": "USR-617648",
       "period": "2026-08",
       "feature": "ai_messages",
-      "count": 20,
+      "count": 21,
       "units": "requests",
-      "lastUsedAt": "2026-08-15T15:17:04.619Z"
+      "lastUsedAt": "2026-08-15T15:20:41.081Z"
     }
   ],
   "adminAuditLogs": [
@@ -1492,6 +1492,66 @@
     }
   ],
   "aiUsageLogs": [
+    {
+      "userId": "user_default_01",
+      "provider": "gemini",
+      "model": "gemini-3.7-flash",
+      "tokensInput": 78,
+      "tokensOutput": 0,
+      "estimatedCost": 0.0001,
+      "success": true,
+      "feature": "ai_messages",
+      "id": "ai_lsbwczh",
+      "timestamp": "2026-08-15T15:24:08.509Z"
+    },
+    {
+      "userId": "user_default_01",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "tokensInput": 42,
+      "tokensOutput": 344,
+      "estimatedCost": 0.0001,
+      "success": true,
+      "feature": "ai_messages",
+      "id": "ai_0bryn9o",
+      "timestamp": "2026-08-15T15:23:58.158Z"
+    },
+    {
+      "userId": "user_default_01",
+      "provider": "gemini",
+      "model": "gemini-3.7-flash",
+      "tokensInput": 6,
+      "tokensOutput": 394,
+      "estimatedCost": 0.0001,
+      "success": true,
+      "feature": "ai_messages",
+      "id": "ai_lt01xrz",
+      "timestamp": "2026-08-15T15:21:07.744Z"
+    },
+    {
+      "userId": "USR-617648",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "tokensInput": 168,
+      "tokensOutput": 3892,
+      "estimatedCost": 0.0001,
+      "success": true,
+      "feature": "ai_messages",
+      "id": "ai_1hx6rz4",
+      "timestamp": "2026-08-15T15:20:41.082Z"
+    },
+    {
+      "userId": "user_default_01",
+      "provider": "gemini",
+      "model": "gemini-flash-latest",
+      "tokensInput": 24,
+      "tokensOutput": 366,
+      "estimatedCost": 0.0001,
+      "success": true,
+      "feature": "ai_messages",
+      "id": "ai_isj4shh",
+      "timestamp": "2026-08-15T15:18:12.915Z"
+    },
     {
       "userId": "USR-617648",
       "provider": "gemini",
