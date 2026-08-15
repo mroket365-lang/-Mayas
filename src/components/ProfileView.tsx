@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { UserProfile, CompanionItem } from '../types';
+import { UserProfile, CompanionItem, DailyCheckIn, MoodType } from '../types';
+import { storageService } from '../services/storageService';
 import { getTranslation } from '../locales/translations';
 import {
   User,
@@ -33,6 +34,13 @@ import {
   Sun,
   Moon,
   Globe,
+  Smile,
+  Flame,
+  Heart,
+  TrendingUp,
+  Activity,
+  Award,
+  Bell,
 } from 'lucide-react';
 import { SystemPublicSettings } from '../App';
 
@@ -46,6 +54,7 @@ interface ProfileViewProps {
   onOpenSubscription: () => void;
   onOpenAuth: () => void;
   onLogout: () => void;
+  onOpenDailyCheckIn?: () => void;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({

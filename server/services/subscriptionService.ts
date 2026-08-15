@@ -21,8 +21,41 @@ export class SubscriptionService {
     subscription: SubscriptionEntity;
     plan: PlanEntity;
   } {
+    const isGuest = !userId || userId === 'user_default_01' || userId.startsWith('guest_') || !userId.startsWith('USR-');
     let user = db.findUserById(userId);
+
+    const plans = db.getPlans();
+    const defaultPlanId = db.getSettings().defaultPlan || 'free';
+    const freePlan = plans.find((p) => p.id === defaultPlanId) || plans.find((p) => p.id === 'free') || plans[0];
+
     if (!user) {
+      if (isGuest) {
+        // Return transient guest subscription without saving to database
+        const guestUser: UserEntity = {
+          id: userId || 'guest',
+          email: 'guest@rafiq.local',
+          name: 'ضيف زائر',
+          role: 'user',
+          status: 'active',
+          createdAt: new Date().toISOString(),
+          lastActiveAt: new Date().toISOString(),
+          currency: 'USD',
+        };
+        const guestSub: SubscriptionEntity = {
+          id: 'sub_guest',
+          userId: guestUser.id,
+          planId: freePlan.id,
+          status: 'active',
+          startDate: new Date().toISOString(),
+          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          autoRenew: false,
+          paymentProvider: 'manual',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        return { user: guestUser, subscription: guestSub, plan: freePlan };
+      }
+
       user = db.upsertUser({
         id: userId,
         email: `${userId}@user.rafiq`,
@@ -44,7 +77,7 @@ export class SubscriptionService {
       sub = db.upsertSubscription({
         id: 'sub_' + Math.random().toString(36).substring(2, 9),
         userId,
-        planId: db.getSettings().defaultPlan || 'free',
+        planId: freePlan.id,
         status: 'active',
         startDate: now.toISOString(),
         endDate: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),

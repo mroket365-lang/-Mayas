@@ -112,6 +112,31 @@ export interface UserProfile {
   specialCounselingVerified18?: boolean;
   specialCounselingExpiresAt?: string;
   specialCounselingLastActivatedDate?: string;
+  dailyCheckInEnabled?: boolean;
+  dailyCheckInTime?: string; // HH:mm (e.g. "20:00")
+  lastDailyCheckInDate?: string; // YYYY-MM-DD
+  checkInStreak?: number;
+}
+
+export type MoodType = 'great' | 'good' | 'neutral' | 'tired' | 'stressed' | 'sad';
+
+export interface HabitCheckInStatus {
+  habitId: string;
+  habitTitle: string;
+  completed: boolean;
+}
+
+export interface DailyCheckIn {
+  id: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:mm
+  mood: MoodType;
+  moodScore: number; // 1 (sad) to 5 (great)
+  energyLevel: number; // 1 to 5
+  note?: string;
+  habitsSummary: HabitCheckInStatus[];
+  source: 'voice' | 'text';
+  createdAt: string;
 }
 
 export type FeatureVisibilityMode = 'hidden' | 'everyone' | 'specific_user' | 'allowed_users_list' | 'region';

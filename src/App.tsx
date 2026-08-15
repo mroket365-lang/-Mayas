@@ -59,15 +59,10 @@ export default function App() {
   const [isReviewing, setIsReviewing] = useState(false);
 
   const handleLogout = () => {
-    const guestProfile: UserProfile = {
-      ...profile,
-      id: undefined,
-      email: undefined,
-      username: undefined,
-      displayName: 'غالي',
-      addressAs: 'يا غالي',
-    };
-    handleUpdateProfile(guestProfile);
+    const { profile: guestProfile, items: emptyItems, messages: emptyMessages } = storageService.resetToGuestSession();
+    setProfile(guestProfile);
+    setItems(emptyItems);
+    setMessages(emptyMessages);
   };
 
   // Sub-second Real-Time System Settings & Variables Synchronization (< 1 second across all screens)
@@ -472,6 +467,7 @@ export default function App() {
         onOpenPermissions={() => setIsPermissionsOpen(true)}
         onOpenSubscription={() => setIsSubscriptionOpen(true)}
         onOpenStats={() => setIsStatsOpen(true)}
+        onOpenAuth={() => setIsAuthOpen(true)}
         systemSettings={systemSettings}
         onOpenMaritalSupport={
           systemSettings?.maritalSupportAllowed !== false
@@ -494,6 +490,7 @@ export default function App() {
             onSendMessage={handleSendMessage}
             isLoading={isLoadingAI}
             onOpenPermissions={() => setIsPermissionsOpen(true)}
+            onOpenAuth={() => setIsAuthOpen(true)}
           />
         )}
 
@@ -627,17 +624,33 @@ export default function App() {
 
               handleUpdateProfile(restoredProfile);
 
-              // Restore messages if present from server database
+              // Merge or Restore messages:
+              // If server has stored messages, prioritize or merge with local session messages
               if (userData.messagesData && Array.isArray(userData.messagesData) && userData.messagesData.length > 0) {
-                setMessages(userData.messagesData);
-                storageService.saveMessages(userData.messagesData);
+                // If local guest had some messages, merge them without duplicating ids
+                const serverMsgIds = new Set(userData.messagesData.map((m: any) => m.id));
+                const uniqueLocalMsgs = messages.filter((m) => !serverMsgIds.has(m.id));
+                const combinedMsgs = [...userData.messagesData, ...uniqueLocalMsgs];
+                setMessages(combinedMsgs);
+                storageService.saveMessages(combinedMsgs);
+              } else if (messages.length > 0) {
+                // New registration or empty account: save current local guest messages to user's storage
+                storageService.saveMessages(messages);
               }
 
-              // Restore items if present from server database
+              // Merge or Restore items:
               if (userData.itemsData && Array.isArray(userData.itemsData) && userData.itemsData.length > 0) {
-                setItems(userData.itemsData);
-                storageService.saveItems(userData.itemsData);
+                const serverItemIds = new Set(userData.itemsData.map((i: any) => i.id));
+                const uniqueLocalItems = items.filter((i) => !serverItemIds.has(i.id));
+                const combinedItems = [...userData.itemsData, ...uniqueLocalItems];
+                setItems(combinedItems);
+                storageService.saveItems(combinedItems);
+              } else if (items.length > 0) {
+                storageService.saveItems(items);
               }
+
+              // Store remember token
+              storageService.setRememberToken(`token_${userData.id}_${Date.now()}`, userData);
             }
           }}
         />

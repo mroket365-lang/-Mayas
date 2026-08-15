@@ -165,16 +165,6 @@ const defaultDatabase: DatabaseSchema = {
       lastActiveAt: new Date().toISOString(),
       currency: 'USD',
     },
-    {
-      id: 'user_default_01',
-      email: 'user@example.com',
-      name: 'Rafiq User',
-      role: 'user',
-      status: 'active',
-      createdAt: new Date().toISOString(),
-      lastActiveAt: new Date().toISOString(),
-      currency: 'USD',
-    },
   ],
   plans: [
     {
@@ -240,18 +230,6 @@ const defaultDatabase: DatabaseSchema = {
       status: 'active',
       startDate: new Date().toISOString(),
       endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-      autoRenew: true,
-      paymentProvider: 'manual',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'sub_user_01',
-      userId: 'user_default_01',
-      planId: 'free',
-      status: 'active',
-      startDate: new Date().toISOString(),
-      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       autoRenew: true,
       paymentProvider: 'manual',
       createdAt: new Date().toISOString(),
@@ -332,9 +310,13 @@ class Database {
       if (fs.existsSync(DB_FILE)) {
         const fileContent = fs.readFileSync(DB_FILE, 'utf-8');
         const parsed = JSON.parse(fileContent);
+        const loadedUsers = (parsed.users || defaultDatabase.users).filter((u: any) => u.id !== 'user_default_01');
+        const loadedSubs = (parsed.subscriptions || defaultDatabase.subscriptions).filter((s: any) => s.userId !== 'user_default_01' && s.id !== 'sub_user_01');
         return {
           ...defaultDatabase,
           ...parsed,
+          users: loadedUsers,
+          subscriptions: loadedSubs,
           settings: { ...defaultDatabase.settings, ...(parsed.settings || {}) },
         };
       } else {

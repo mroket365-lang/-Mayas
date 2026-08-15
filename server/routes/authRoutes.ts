@@ -381,16 +381,18 @@ const handleUpdateProfile = (req: Request, res: Response) => {
 
   let user = db.findUserById(userId);
   if (!user) {
-    // If user is local/guest and updating profile, create entry in db
-    user = {
-      id: userId,
-      email: `${userId.toLowerCase()}@rafiq.local`,
-      name: name || 'مستخدم الرفيق',
-      role: 'user',
-      status: 'active',
-      createdAt: new Date().toISOString(),
-      lastActiveAt: new Date().toISOString(),
-    };
+    // If user is guest/not in db, simply return success without polluting admin panel with unregistered user
+    return res.json({
+      success: true,
+      message: 'تم تحديث تفضيلات الجلسة المحلية بنجاح',
+      user: {
+        id: userId,
+        accountId: userId,
+        name: name || 'ضيف زائر',
+        addressAs: addressAs || 'يا غالي',
+        role: 'guest',
+      },
+    });
   }
 
   // Only update formal account name if explicitly provided and not just modifying companion nickname

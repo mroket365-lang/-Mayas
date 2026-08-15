@@ -14,6 +14,8 @@ import {
   SlidersHorizontal,
   BarChart3,
   X,
+  LogIn,
+  UserCheck,
 } from 'lucide-react';
 import { UserProfile, AppLanguage } from '../types';
 import { getTranslation, supportedLanguages } from '../locales/translations';
@@ -27,6 +29,7 @@ interface HeaderProps {
   onOpenSubscription?: () => void;
   onOpenMaritalSupport?: () => void;
   onOpenStats?: () => void;
+  onOpenAuth?: () => void;
   systemSettings?: SystemPublicSettings | null;
 }
 
@@ -38,6 +41,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSubscription,
   onOpenMaritalSupport,
   onOpenStats,
+  onOpenAuth,
   systemSettings,
 }) => {
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
@@ -45,6 +49,10 @@ export const Header: React.FC<HeaderProps> = ({
   const t = getTranslation(profile.language);
   const isArabic = profile.language === 'ar';
   const currentLangObj = supportedLanguages.find((l) => l.code === profile.language) || supportedLanguages[0];
+
+  const isLoggedIn = Boolean(
+    profile.email || (profile.id && profile.id.startsWith('USR-') && profile.id !== 'user_default_01')
+  );
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -91,8 +99,17 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right / End: Streamlined Controls */}
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-        {/* 1. Prominent Upgrade / Subscription Button */}
-        {onOpenSubscription && (
+        {/* Guest Auth Action or Pro Subscription Button */}
+        {!isLoggedIn && onOpenAuth ? (
+          <button
+            onClick={onOpenAuth}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs shadow-md shadow-emerald-600/20 transition-all hover:scale-105 active:scale-95 shrink-0"
+            title={isArabic ? 'تسجيل الدخول / إنشاء حساب' : 'Log In / Sign Up'}
+          >
+            <LogIn className="w-3.5 h-3.5 shrink-0" />
+            <span className="whitespace-nowrap">{isArabic ? 'دخول / تسجيل' : 'Login / Sign Up'}</span>
+          </button>
+        ) : onOpenSubscription ? (
           <button
             onClick={onOpenSubscription}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-500 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold text-xs shadow-md shadow-amber-500/20 transition-all hover:scale-105 active:scale-95 shrink-0"
@@ -101,7 +118,7 @@ export const Header: React.FC<HeaderProps> = ({
             <Crown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-100 animate-pulse shrink-0" />
             <span className="whitespace-nowrap">{isArabic ? 'ترقية ✨' : 'Upgrade ✨'}</span>
           </button>
-        )}
+        ) : null}
 
         {/* 1.5. Stats Modal Quick Trigger */}
         {onOpenStats && (

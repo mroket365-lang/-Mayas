@@ -31,6 +31,7 @@ import {
 import { speechService } from '../services/speechService';
 import { AudioWaveform } from './AudioWaveform';
 import { SnippetExtractorModal } from './SnippetExtractorModal';
+import { GuestBanner } from './GuestBanner';
 
 interface CompanionViewProps {
   messages: ChatMessage[];
@@ -43,6 +44,7 @@ interface CompanionViewProps {
   ) => Promise<void>;
   isLoading: boolean;
   onOpenPermissions: () => void;
+  onOpenAuth?: () => void;
 }
 
 interface ChatMessageItemProps {
@@ -218,6 +220,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
   onSendMessage,
   isLoading,
   onOpenPermissions,
+  onOpenAuth,
 }) => {
   const [inputText, setInputText] = useState('');
   const [isVoiceOverlayOpen, setIsVoiceOverlayOpen] = useState(false);
@@ -232,6 +235,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
   const [aiSpokenText, setAiSpokenText] = useState<string>('');
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
   const [micPermissionError, setMicPermissionError] = useState(false);
+  const [isGuestBannerDismissed, setIsGuestBannerDismissed] = useState(false);
 
   // MediaRecorder & Navigation refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -626,8 +630,20 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const isGuest = !profile.email && (!profile.id || !profile.id.startsWith('USR-') || profile.id === 'user_default_01');
+
   return (
     <div className="flex flex-col h-full w-full max-w-2xl mx-auto relative min-h-0 overflow-hidden flex-1">
+      {/* Guest Invitation Notification Banner */}
+      {isGuest && !isGuestBannerDismissed && onOpenAuth && (
+        <GuestBanner
+          language={profile.language}
+          onOpenAuth={onOpenAuth}
+          onDismiss={() => setIsGuestBannerDismissed(true)}
+          messageCount={messages.length}
+        />
+      )}
+
       {(profile.privateCandidMode || profile.personality === 'bold') && (
         <div className="mx-3 mt-2 px-3.5 py-2 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-rose-500/15 border border-amber-500/30 text-[11px] font-bold text-amber-600 dark:text-amber-400 flex items-center justify-between gap-2 shadow-sm animate-fade-in shrink-0">
           <div className="flex items-center gap-2">

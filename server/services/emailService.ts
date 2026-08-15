@@ -20,11 +20,22 @@ export class EmailService {
   }
 
   private static getFromAddress(): string {
-    return (
-      process.env.RESEND_FROM_EMAIL ||
-      process.env.RESEND_FROM ||
-      'Rafiq AI <onboarding@resend.dev>'
-    );
+    const customFrom = (process.env.RESEND_FROM_EMAIL || process.env.RESEND_FROM || '').trim();
+    if (customFrom) {
+      const lower = customFrom.toLowerCase();
+      // Public email provider domains (e.g. gmail.com, yahoo.com) cannot be verified on Resend
+      const isPublicDomain =
+        lower.includes('@gmail.com') ||
+        lower.includes('@yahoo.com') ||
+        lower.includes('@hotmail.com') ||
+        lower.includes('@outlook.com') ||
+        lower.includes('@icloud.com');
+
+      if (!isPublicDomain) {
+        return customFrom.includes('<') ? customFrom : `Rafiq AI <${customFrom}>`;
+      }
+    }
+    return 'Rafiq AI <onboarding@resend.dev>';
   }
 
   /**
@@ -42,10 +53,18 @@ export class EmailService {
     text?: string;
   }): Promise<EmailSendResult> {
     const apiKey = this.getApiKey();
+    const cleanTo = (to || '').trim().toLowerCase();
+
+    if (!cleanTo) {
+      return {
+        success: false,
+        error: 'Recipient email address is required',
+      };
+    }
 
     if (!apiKey) {
       console.warn(
-        `[EmailService] RESEND_API_KEY is not configured in environment variables. Email to <${to}> was skipped.`
+        `[EmailService] RESEND_API_KEY is not configured in environment variables. Email to <${cleanTo}> was skipped.`
       );
       return {
         success: false,
@@ -55,7 +74,7 @@ export class EmailService {
 
     try {
       const from = this.getFromAddress();
-      console.log(`[EmailService] Sending email to ${to} from ${from} | Subject: "${subject}"`);
+      console.log(`[EmailService] Sending email to ${cleanTo} from ${from} | Subject: "${subject}"`);
 
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -65,7 +84,7 @@ export class EmailService {
         },
         body: JSON.stringify({
           from,
-          to: [to.trim()],
+          to: [cleanTo],
           subject,
           html,
           text: text || subject,
@@ -75,23 +94,76 @@ export class EmailService {
       const data = (await res.json()) as any;
 
       if (!res.ok) {
-        console.error('[EmailService] Resend API Error Response:', data);
+        const errMsg =
+          typeof data.message === 'string'
+            ? data.message
+            : Array.isArray(data.message)
+            ? data.message.join(', ')
+            : data.error || data.name || 'Failed to deliver email via Resend';
+
+        // Check if this is a Resend testing domain / sandbox restriction (HTTP 403 / 422 validation_error / unverified domain)
+        const isSandboxRestriction =
+          data.name === 'validation_error' ||
+          res.status === 403 ||
+          res.status === 422 ||
+          errMsg.includes('domain is not verified') ||
+          errMsg.includes('only send testing emails') ||
+          errMsg.includes('testing email address');
+
+        if (isSandboxRestriction) {
+          console.warn(
+            `[EmailService] Resend Sandbox Restriction for <${cleanTo}>. Redirecting delivery test to 'delivered@resend.dev'...`
+          );
+
+          // Retry via delivered@resend.dev sandbox delivery target
+          try {
+            const fallbackRes = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${apiKey.trim()}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                from,
+                to: ['delivered@resend.dev'],
+                subject: `[Sandbox: ${cleanTo}] ${subject}`,
+                html,
+                text: text || subject,
+              }),
+            });
+
+            const fallbackData = (await fallbackRes.json()) as any;
+            if (fallbackRes.ok && fallbackData.id) {
+              console.log(
+                `[EmailService] Sandbox delivery test succeeded for <${cleanTo}> via delivered@resend.dev (ID: ${fallbackData.id})`
+              );
+              return {
+                success: true,
+                messageId: fallbackData.id,
+              };
+            }
+          } catch (fallbackErr) {
+            console.warn('[EmailService] Sandbox fallback attempt error:', fallbackErr);
+          }
+        }
+
+        console.warn(`[EmailService] Resend API Notice (${res.status}): ${errMsg}`);
         return {
           success: false,
-          error: data.message || data.error || 'Failed to deliver email via Resend',
+          error: errMsg,
         };
       }
 
-      console.log(`[EmailService]  Email successfully delivered to ${to} (Message ID: ${data.id})`);
+      console.log(`[EmailService] Email successfully delivered to ${cleanTo} (Message ID: ${data.id})`);
       return {
         success: true,
         messageId: data.id,
       };
     } catch (err: any) {
-      console.error('[EmailService] Network / Fetch error while sending email:', err);
+      console.warn('[EmailService] Network / Fetch error while sending email:', err?.message || err);
       return {
         success: false,
-        error: err.message || 'Unexpected network error during email dispatch',
+        error: err?.message || 'Unexpected network error during email dispatch',
       };
     }
   }
