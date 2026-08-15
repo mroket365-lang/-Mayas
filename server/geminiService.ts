@@ -33,7 +33,7 @@ Task title: "${taskTitle}"
 ${description ? `Description: "${description}"` : ''}`;
 
     const res = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-3.7-flash',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',

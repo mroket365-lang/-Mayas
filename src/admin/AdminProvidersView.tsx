@@ -122,9 +122,10 @@ export const AdminProvidersView: React.FC<AdminProvidersViewProps> = ({ token })
                 onChange={(e) => handleUpdateProvider('gemini', providers.gemini.enabled, e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono"
               >
-                <option value="gemini-3.6-flash">gemini-3.6-flash (موصى به)</option>
-                <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-                <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+                <option value="gemini-3.7-flash">gemini-3.7-flash (موصى به - أحدث إصدار)</option>
+                <option value="gemini-flash-latest">gemini-flash-latest</option>
+                <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite (سريع وخفيف)</option>
+                <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview (متقدم للمهام المعقدة)</option>
               </select>
             </div>
 

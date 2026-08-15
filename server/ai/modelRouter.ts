@@ -17,7 +17,7 @@ export class ModelRouter {
     this.configs.set('gemini', {
       name: 'gemini',
       enabled: true,
-      model: 'gemini-3.6-flash',
+      model: 'gemini-3.7-flash',
       priority: 1,
       speedLevel: 'fast',
       qualityLevel: 'high',

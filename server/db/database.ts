@@ -271,7 +271,7 @@ const defaultDatabase: DatabaseSchema = {
     multiAIEnabled: true,
     voiceEnabled: true,
     providers: {
-      gemini: { enabled: true, model: 'gemini-3.6-flash' },
+      gemini: { enabled: true, model: 'gemini-3.7-flash' },
       openai: { enabled: true, model: 'gpt-4o-mini' },
     },
     privateCandidVisibility: { mode: 'hidden' },

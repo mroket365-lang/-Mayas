@@ -168,7 +168,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ stats, o
               <div>
                 <p className="font-medium text-slate-200 text-sm">Google Gemini (Primary)</p>
                 <p className="text-xs text-slate-400 font-mono">
-                  Model: {stats.settings?.providers?.gemini?.model || 'gemini-3.6-flash'}
+                  Model: {stats.settings?.providers?.gemini?.model || 'gemini-3.7-flash'}
                 </p>
               </div>
               <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">

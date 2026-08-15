@@ -149,58 +149,44 @@ export const geminiToolDeclarations: FunctionDeclaration[] = [
 
 export class GeminiProvider extends AIProvider {
   readonly name = 'gemini';
-  readonly defaultModel = 'gemini-2.5-flash';
+  readonly defaultModel = 'gemini-3.7-flash';
 
   isAvailable(): boolean {
     return !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0;
   }
 
   async generateResponse(params: AIProviderParams): Promise<ProviderResponse> {
-    const modelsToTry = [this.defaultModel, 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest'];
+    const modelsToTry = [this.defaultModel, 'gemini-3.7-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
     let lastError: unknown = null;
 
     for (const modelName of Array.from(new Set(modelsToTry))) {
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          const client = getGeminiClient();
-          const res = await client.models.generateContent({
-            model: modelName,
-            contents: params.contents as any,
-            config: {
-              systemInstruction: params.systemInstruction,
-              temperature: params.temperature ?? 0.3,
-              tools: params.tools || [{ functionDeclarations: geminiToolDeclarations }],
-            },
-          });
+      try {
+        const client = getGeminiClient();
+        const res = await client.models.generateContent({
+          model: modelName,
+          contents: params.contents as any,
+          config: {
+            systemInstruction: params.systemInstruction,
+            temperature: params.temperature ?? 0.3,
+            tools: params.tools || [{ functionDeclarations: geminiToolDeclarations }],
+          },
+        });
 
-          const functionCalls: ToolCallRequest[] = (res.functionCalls || []).map((fc) => ({
-            name: fc.name,
-            args: (fc.args || {}) as Record<string, any>,
-          }));
+        const functionCalls: ToolCallRequest[] = (res.functionCalls || []).map((fc) => ({
+          name: fc.name,
+          args: (fc.args || {}) as Record<string, any>,
+        }));
 
-          return {
-            text: res.text || '',
-            functionCalls,
-            providerName: this.name,
-            modelUsed: modelName,
-          };
-        } catch (err: any) {
-          lastError = err;
-          const errStr = String(err?.message || err);
-          if (attempt === 0 && (errStr.includes('429') || errStr.includes('RESOURCE_EXHAUSTED'))) {
-            const match = errStr.match(/retry in (\d+(\.\d+)?)s/i);
-            const delaySec = match ? parseFloat(match[1]) : 2;
-            if (delaySec <= 3) {
-              await new Promise((resolve) => setTimeout(resolve, Math.ceil(delaySec * 1000) + 100));
-              continue;
-            }
-          }
-          if (attempt === 0 && (errStr.includes('503') || errStr.includes('UNAVAILABLE') || errStr.includes('500'))) {
-            await new Promise((resolve) => setTimeout(resolve, 200));
-            continue;
-          }
-          break;
-        }
+        return {
+          text: res.text || '',
+          functionCalls,
+          providerName: this.name,
+          modelUsed: modelName,
+        };
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[GeminiProvider] Model ${modelName} call failed, trying next fallback model:`, err?.message || err);
+        await new Promise((resolve) => setTimeout(resolve, 150));
       }
     }
 
@@ -211,56 +197,50 @@ export class GeminiProvider extends AIProvider {
     params: AIProviderParams,
     onChunk: (text: string) => void
   ): Promise<ProviderResponse> {
-    const modelsToTry = [this.defaultModel, 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest'];
+    const modelsToTry = [this.defaultModel, 'gemini-3.7-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
     let lastError: unknown = null;
 
     for (const modelName of Array.from(new Set(modelsToTry))) {
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          const client = getGeminiClient();
-          const stream = await client.models.generateContentStream({
-            model: modelName,
-            contents: params.contents as any,
-            config: {
-              systemInstruction: params.systemInstruction,
-              temperature: params.temperature ?? 0.3,
-              tools: params.tools || [{ functionDeclarations: geminiToolDeclarations }],
-            },
-          });
+      try {
+        const client = getGeminiClient();
+        const stream = await client.models.generateContentStream({
+          model: modelName,
+          contents: params.contents as any,
+          config: {
+            systemInstruction: params.systemInstruction,
+            temperature: params.temperature ?? 0.3,
+            tools: params.tools || [{ functionDeclarations: geminiToolDeclarations }],
+          },
+        });
 
-          let fullText = '';
-          const accumulatedCalls: ToolCallRequest[] = [];
+        let fullText = '';
+        const accumulatedCalls: ToolCallRequest[] = [];
 
-          for await (const chunk of stream) {
-            if (chunk.text) {
-              fullText += chunk.text;
-              onChunk(chunk.text);
-            }
-            if (chunk.functionCalls && chunk.functionCalls.length > 0) {
-              for (const fc of chunk.functionCalls) {
-                accumulatedCalls.push({
-                  name: fc.name,
-                  args: (fc.args || {}) as Record<string, any>,
-                });
-              }
+        for await (const chunk of stream) {
+          if (chunk.text) {
+            fullText += chunk.text;
+            onChunk(chunk.text);
+          }
+          if (chunk.functionCalls && chunk.functionCalls.length > 0) {
+            for (const fc of chunk.functionCalls) {
+              accumulatedCalls.push({
+                name: fc.name,
+                args: (fc.args || {}) as Record<string, any>,
+              });
             }
           }
-
-          return {
-            text: fullText,
-            functionCalls: accumulatedCalls,
-            providerName: this.name,
-            modelUsed: modelName,
-          };
-        } catch (err: any) {
-          lastError = err;
-          const errStr = String(err?.message || err);
-          if (attempt === 0 && (errStr.includes('503') || errStr.includes('UNAVAILABLE') || errStr.includes('500'))) {
-            await new Promise((resolve) => setTimeout(resolve, 150));
-            continue;
-          }
-          break;
         }
+
+        return {
+          text: fullText,
+          functionCalls: accumulatedCalls,
+          providerName: this.name,
+          modelUsed: modelName,
+        };
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[GeminiProvider] Model ${modelName} stream failed, trying next fallback model:`, err?.message || err);
+        await new Promise((resolve) => setTimeout(resolve, 150));
       }
     }
 

@@ -10,6 +10,89 @@ import { db } from '../db/database.js';
 
 const router = new ModelRouter();
 
+function generateSmartFallbackReply(
+  message: string,
+  profile: UserProfile,
+  items: CompanionItem[],
+  currentDateStr: string
+): { replyText: string; createdOrUpdatedItems: CompanionItem[]; actions: ActionSummary[] } {
+  const isArabic = profile.language === 'ar';
+  const addressAs = profile.addressAs || (isArabic ? 'يا غالي' : 'friend');
+  const cleanMsg = (message || '').trim().toLowerCase();
+
+  const createdOrUpdatedItems: CompanionItem[] = [];
+  const actions: ActionSummary[] = [];
+
+  // Greetings
+  if (/^(مرحبا|أهلا|اهلا|هلا|السلام عليكم|سلام|صباح الخير|مساء الخير|هاي|hello|hi|hey)/i.test(cleanMsg)) {
+    const replyText = isArabic
+      ? `أهلاً وسهلاً بك ${addressAs} ❤️ أنا معك ومستعد لمساعدتك في تنظيم يومك ومواعيدك ومهامك. كيف أقدر أخدمك اليوم؟ ✨`
+      : `Hello ${addressAs}! I am here with you, ready to help you manage your day and tasks. How can I assist you today? ✨`;
+    return { replyText, createdOrUpdatedItems, actions };
+  }
+
+  // Schedule & Tasks inquiry
+  if (/(مهامي|مواعيدي|جدولي|وش عندي|ماذا لدي|today|tasks|schedule)/i.test(cleanMsg)) {
+    const todayItems = items.filter((i) => !i.dueDate || i.dueDate === currentDateStr);
+    const pendingCount = todayItems.filter((i) => i.status === 'pending').length;
+    let replyText = '';
+
+    if (isArabic) {
+      if (todayItems.length === 0) {
+        replyText = `جدولك اليوم هادئ ومرتب ${addressAs}، ما عندك أي مهام مسجلة لليوم. تحب نضيف أي مهمة أو تذكير جديد؟ ✨`;
+      } else {
+        const itemTitles = todayItems.slice(0, 5).map((i) => `• ${i.title} (${i.status === 'completed' ? 'منجز' : 'قيد الانتظار'})`).join('\n');
+        replyText = `إليك نظرة سريعة على جدولك اليوم ${addressAs} (لديك ${pendingCount} مهام متبقية):\n${itemTitles}\n\nأنا معك دائماً للمساعدة في إنجازها خطوة بخطوة! 💪`;
+      }
+    } else {
+      replyText = `You have ${pendingCount} pending items for today, ${addressAs}. Let me know if you need to adjust or add anything!`;
+    }
+    return { replyText, createdOrUpdatedItems, actions };
+  }
+
+  // Quick Task / Reminder creation fallback
+  const reminderMatch = cleanMsg.match(/(?:ذكرني|سجل|أضف|اضف|مهمة جديدة|موعد|remind me to|add task)\s+(.+)/i);
+  if (reminderMatch && reminderMatch[1]) {
+    const title = reminderMatch[1].trim();
+    const isAppointment = cleanMsg.includes('موعد') || cleanMsg.includes('appointment');
+    const newItem: CompanionItem = {
+      id: 'item_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      userId: profile.id || 'user_default_01',
+      type: isAppointment ? 'appointment' : 'task',
+      title: title.length > 50 ? title.substring(0, 50) + '...' : title,
+      description: `تم إنشاؤها عبر الرفيق: "${title}"`,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      dueDate: currentDateStr,
+      priority: 'medium',
+      repeatRule: 'none',
+      progressPercent: 0,
+    };
+    createdOrUpdatedItems.push(newItem);
+    actions.push({
+      type: 'created',
+      itemType: newItem.type,
+      title: newItem.title,
+      details: isArabic ? `تمت إضافة ${isAppointment ? 'الموعد' : 'المهمة'}: "${newItem.title}"` : `Added ${newItem.title}`,
+      itemId: newItem.id,
+    });
+
+    const replyText = isArabic
+      ? `أبشر ${addressAs}! تم تسجيل ${isAppointment ? 'الموعد' : 'المهمة'} "${newItem.title}" بنجاح في جدولك لليوم ❤️`
+      : `Done, ${addressAs}! I added "${newItem.title}" to your schedule for today ❤️`;
+
+    return { replyText, createdOrUpdatedItems, actions };
+  }
+
+  // General warm companion fallback
+  const replyText = isArabic
+    ? `أنا معك وأسمعك بكل اهتمام ${addressAs} ❤️ تواصل معي بأي وقت وسأساعدك في تنظيم أفكارك ومواعيدك ومهامك بكل سرور ✨`
+    : `I am right here with you, ${addressAs}! Let me know whenever you need help organizing your tasks or reminders.`;
+
+  return { replyText, createdOrUpdatedItems, actions };
+}
+
 export async function processOrchestratedChatStream(
   request: OrchestrationRequest,
   onChunk: (chunkText: string) => void
@@ -82,7 +165,7 @@ export async function processOrchestratedChatStream(
     db.addAIUsageLog({
       userId,
       provider: providerUsed,
-      model: providerUsed === 'gemini' ? 'gemini-3.6-flash' : 'gpt-4o-mini',
+      model: response.modelUsed || (providerUsed === 'gemini' ? 'gemini-3.7-flash' : 'gpt-4o-mini'),
       tokensInput: message.length * 2,
       tokensOutput: response.text.length * 2,
       estimatedCost: 0.0001,
@@ -111,14 +194,12 @@ export async function processOrchestratedChatStream(
     };
   } catch (error) {
     console.error('[AI Orchestrator] Streaming error:', error);
-    const fallbackText = isArabic
-      ? 'واضح أن الاتصال عندي فيه مشكلة بسيطة الآن. حاول ترسلها لي مرة ثانية بعد قليل يا غالي ❤️'
-      : 'Connection issue encountered. Please send that again in a moment, my friend!';
-    onChunk(fallbackText);
+    const fallback = generateSmartFallbackReply(message, profile, items, currentDateStr);
+    onChunk(fallback.replyText);
     return {
-      replyText: fallbackText,
-      actions: [],
-      createdOrUpdatedItems: [],
+      replyText: fallback.replyText,
+      actions: fallback.actions,
+      createdOrUpdatedItems: fallback.createdOrUpdatedItems,
       providerUsed: 'fallback',
       isMultiModelSynthesized: false,
     };
@@ -199,7 +280,7 @@ export async function processOrchestratedChat(
     db.addAIUsageLog({
       userId,
       provider: primaryProviderUsed,
-      model: primaryProviderUsed === 'gemini' ? 'gemini-3.6-flash' : 'gpt-4o-mini',
+      model: responses[0]?.modelUsed || (primaryProviderUsed === 'gemini' ? 'gemini-3.7-flash' : 'gpt-4o-mini'),
       tokensInput: message.length * 2,
       tokensOutput: (responses[0]?.text || '').length * 2,
       estimatedCost: isMultiModel ? 0.0003 : 0.0001,
@@ -230,12 +311,11 @@ export async function processOrchestratedChat(
     };
   } catch (error) {
     console.error('[AI Orchestrator] Execution error:', error);
+    const fallback = generateSmartFallbackReply(message, profile, items, currentDateStr);
     return {
-      replyText: isArabic
-        ? 'واضح أن الاتصال عندي فيه مشكلة بسيطة الآن. حاول ترسلها لي مرة ثانية بعد قليل يا غالي ❤️'
-        : 'Connection issue encountered. Please send that again in a moment, my friend!',
-      actions: [],
-      createdOrUpdatedItems: [],
+      replyText: fallback.replyText,
+      actions: fallback.actions,
+      createdOrUpdatedItems: fallback.createdOrUpdatedItems,
       providerUsed: 'fallback',
       isMultiModelSynthesized: false,
     };
