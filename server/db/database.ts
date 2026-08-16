@@ -107,6 +107,52 @@ export interface FeatureFlagConfig {
   allowedRegion?: string;
 }
 
+export type FeatureCategory = 'tabs' | 'actions' | 'chat_tools' | 'saved_tools' | 'preferences' | 'ai_modules';
+export type FeatureAudience = 'everyone' | 'authenticated_only' | 'specific_users' | 'disabled';
+export type FeatureLockedBehavior = 'hide' | 'badge_lock';
+
+export interface ProgressiveDisclosureConfig {
+  enabled: boolean;
+  minAccountAgeDays: number;
+  minMessagesSent: number;
+  minCompletedTasks: number;
+}
+
+export interface FeatureTimeWindowConfig {
+  enabled: boolean;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
+export interface FeatureRuleConfig {
+  id: string;
+  nameAr: string;
+  nameEn: string;
+  descriptionAr: string;
+  descriptionEn: string;
+  category: FeatureCategory;
+  icon: string;
+  targetAudience: FeatureAudience;
+  specificUsers: string[];
+  allowedPlans: string[]; // ['free', 'premium', 'pro'] or ['all']
+  progressiveDisclosure: ProgressiveDisclosureConfig;
+  timeWindow: FeatureTimeWindowConfig;
+  lockedBehavior: FeatureLockedBehavior;
+  customLockMessage?: string;
+  updatedAt?: string;
+}
+
+export interface EvaluatedFeatureStatus {
+  id: string;
+  enabled: boolean;
+  locked: boolean;
+  lockedBehavior: FeatureLockedBehavior;
+  reason?: 'disabled' | 'specific_users_only' | 'requires_auth' | 'plan_restricted' | 'progressive_time_locked' | 'progressive_messages_locked' | 'progressive_tasks_locked' | 'outside_time_window' | 'ok';
+  lockMessage?: string;
+  name: string;
+  icon: string;
+}
+
 export interface PaymentMethodEntity {
   id: string;
   type: 'bank' | 'wallet' | 'card';
@@ -136,6 +182,7 @@ export interface SystemSettingsEntity {
   superAdminEmail?: string;
   superAdminPassword?: string;
   paymentMethods?: PaymentMethodEntity[];
+  features?: FeatureRuleConfig[];
   updatedAt?: string;
 }
 
@@ -161,6 +208,251 @@ const getEnvAdminEmail = (): string => {
 const getEnvAdminPassword = (): string => {
   return process.env.ADMIN_PASSWORD || process.env.SUPER_ADMIN_PASSWORD || 'AdminSecret2026!';
 };
+
+export const defaultFeaturesList: FeatureRuleConfig[] = [
+  {
+    id: 'tab_companion',
+    nameAr: 'واجهة المحادثة والرفيق',
+    nameEn: 'Companion Chat Interface',
+    descriptionAr: 'الشاشة الرئيسية للدردشة والتفاعل الذكي مع الرفيق',
+    descriptionEn: 'Main companion chat screen and conversational AI',
+    category: 'tabs',
+    icon: 'MessageCircle',
+    targetAudience: 'everyone',
+    specificUsers: [],
+    allowedPlans: ['all'],
+    progressiveDisclosure: { enabled: false, minAccountAgeDays: 0, minMessagesSent: 0, minCompletedTasks: 0 },
+    timeWindow: { enabled: false },
+    lockedBehavior: 'hide',
+  },
+  {
+    id: 'tab_today',
+    nameAr: 'واجهة يومي والمراجعة',
+    nameEn: 'Today Agenda & Review Tab',
+    descriptionAr: 'جدول اليوم والمهام الحالية والمراجعة اليومية',
+    descriptionEn: 'Daily agenda, today tasks, and daily AI review',
+    category: 'tabs',
+    icon: 'Calendar',
+    targetAudience: 'everyone',
+    specificUsers: [],
+    allowedPlans: ['all'],
+    progressiveDisclosure: { enabled: false, minAccountAgeDays: 0, minMessagesSent: 0, minCompletedTasks: 0 },
+    timeWindow: { enabled: false },
+    lockedBehavior: 'hide',
+  },
+  {
+    id: 'tab_saved',
+    nameAr: 'واجهة المحفوظات والمهام',
+    nameEn: 'Saved Items & Tasks Tab',
+    descriptionAr: 'سجل كافة المهام، المواعيد، الأهداف، والروابط المحفوظة',
+    descriptionEn: 'All saved tasks, appointments, goals, and notes repository',
+    category: 'tabs',
+    icon: 'BookmarkCheck',
+    targetAudience: 'everyone',
+    specificUsers: [],
+    allowedPlans: ['all'],
+    progressiveDisclosure: { enabled: false, minAccountAgeDays: 0, minMessagesSent: 0, minCompletedTasks: 0 },
+    timeWindow: { enabled: false },
+    lockedBehavior: 'hide',
+  },
+  {
+    id: 'tab_profile',
+    nameAr: 'واجهة البروفايل والتفضيلات',
+    nameEn: 'Profile & Settings Tab',
+    descriptionAr: 'إعدادات الحساب، الشخصية، اللغة، وإدارة الاشتراك',
+    descriptionEn: 'Account settings, companion personality, language, and plan tier',
+    category: 'tabs',
+    icon: 'User',
+    targetAudience: 'everyone',
+    specificUsers: [],
+    allowedPlans: ['all'],
+    progressiveDisclosure: { enabled: false, minAccountAgeDays: 0, minMessagesSent: 0, minCompletedTasks: 0 },
+    timeWindow: { enabled: false },
+    lockedBehavior: 'hide',
+  },
+  {
+    id: 'tool_stats',
+    nameAr: 'زر ومودال الإحصائيات والاستهلاك',
+    nameEn: 'Stats & Analytics Modal',
+    descriptionAr: 'إحصائيات إنجاز المهام، استهلاك الذكاء الاصطناعي، ونسب الالتزام',
+    descriptionEn: 'Task completion rates, AI token usage, and habit consistency stats',
+    category: 'actions',
+    icon: 'BarChart3',
+    targetAudience: 'everyone',
+    specificUsers: [],
+    allowedPlans: ['all'],
+    progressiveDisclosure: { enabled: false, minAccountAgeDays: 0, minMessagesSent: 0, minCompletedTasks: 0 },
+    timeWindow: { enabled: false },
+    lockedBehavior: 'badge_lock',
+    customLockMessage: 'متاح لجميع المشتركين لاستعراض تقدمهم اليومي والإحصائي',
+  },
+  {
+    id: 'tool_voice_input',
+    nameAr: 'زر الإدخال والتسجيل الصوتي',
+    nameEn: 'Voice Input / Mic',
+    descriptionAr: 'زر الميكروفون للحديث الصوتي المباشر مع الرفيق',
+    descriptionEn: 'Direct speech-to-text microphone button in chat',
+    category: 'chat_tools',
+    icon: 'Mic',
+    targetAudience: 'everyone',
+    specificUsers: [],
+    allowedPlans: ['all'],
+    progressiveDisclosure: { enabled: false, minAccountAgeDays: 0, minMessagesSent: 0, minCompletedTasks: 0 },
+    timeWindow: { enabled: false },
+    lockedBehavior: 'hide',
+  },
+  {
+    id: 'tool_voice_reply',
+    nameAr: 'الردود الصوتية للرفيق (TTS)',
+    nameEn: 'AI Voice Speech Reply',
+    descriptionAr: 'نطق رسائل الرفيق صوتياً بنبرة طبيعية وواقعية',
+    descriptionEn: 'Natural text-to-speech audio synthesis responses',
+    category: 'chat_tools',
+    icon: 'Volume2',
+    targetAudience: 'everyone',
+    specificUsers: [],
+    allowedPlans: ['all'],
+    progressiveDisclosure: { enabled: false, minAccountAgeDays: 0, minMessagesSent: 0, minCompletedTasks: 0 },
+    timeWindow: { enabled: false },
+    lockedBehavior: 'hide',
+  },
+  {
+    id: 'tool_attachments',
+    nameAr: 'إرفاق الوسائط والصور والملفات',
+    nameEn: 'Media Attachments',
+    descriptionAr: 'إمكانية إرسال وتحليل الصور والمستندات داخل الدردشة',
+    descriptionEn: 'Image, video and document attachment and vision AI analysis',
+    category: 'chat_tools',
+    icon: 'Paperclip',
+    targetAudience: 'everyone',
+    specificUsers: [],
+    allowedPlans: ['all'],
+    progressiveDisclosure: { enabled: false, minAccountAgeDays: 0, minMessagesSent: 0, minCompletedTasks: 0 },
+    timeWindow: { enabled: false },
+    lockedBehavior: 'badge_lock',
+    customLockMessage: 'ميزة إرفاق الصور والوسائط تتطلب حساباً مفعلاً',
+  },
+  {
+    id: 'tool_private_candid',
+    nameAr: 'وضع المصارحة والخواطر السرية الجريئة',
+    nameEn: 'Private Candid Thoughts Mode',
+    descriptionAr: 'نقاشات صريحة وغير مقيدة وحوارات عميقة مشفرة',
+    descriptionEn: 'Unfiltered, confidential, and deep candid conversations',
+    category: 'chat_tools',
+    icon: 'Flame',
+    targetAudience: 'everyone',
+    specificUsers: [],
+    allowedPlans: ['all'],
+    progressiveDisclosure: { enabled: false, minAccountAgeDays: 0, minMessagesSent: 0, minCompletedTasks: 0 },
+    timeWindow: { enabled: false },
+    lockedBehavior: 'badge_lock',
+  },
+  {
+    id: 'tool_marital_counseling',
+    nameAr: 'مساعد الاستشارات الزوجية والعلاقات',
+    nameEn: 'Marital & Relationship Coach',
+    descriptionAr: 'جلسات استشارية متخصصة لحل النزاعات وفهم العلاقات',
+    descriptionEn: 'Specialized relationship & marriage coaching advisor',
+    category: 'chat_tools',
+    icon: 'HeartHandshake',
+    targetAudience: 'everyone',
+    specificUsers: [],
+    allowedPlans: ['all'],
+    progressiveDisclosure: { enabled: false, minAccountAgeDays: 0, minMessagesSent: 0, minCompletedTasks: 0 },
+    timeWindow: { enabled: false },
+    lockedBehavior: 'badge_lock',
+  },
+  {
+    id: 'feature_goals_tracking',
+    nameAr: 'تتبع الأهداف والمراحل بالذكاء الاصطناعي',
+    nameEn: 'AI Goals & Milestone Tracking',
+    descriptionAr: 'تفكيك الأهداف الكبرى إلى مراحل زمنية ومتابعة نسب الإنجاز',
+    descriptionEn: 'Strategic goal breakdown, progress bars, and AI milestones analysis',
+    category: 'saved_tools',
+    icon: 'Target',
+    targetAudience: 'everyone',
+    specificUsers: [],
+    allowedPlans: ['all'],
+    progressiveDisclosure: { enabled: false, minAccountAgeDays: 0, minMessagesSent: 0, minCompletedTasks: 0 },
+    timeWindow: { enabled: false },
+    lockedBehavior: 'badge_lock',
+  },
+  {
+    id: 'feature_snippet_extractor',
+    nameAr: 'استخراج الاقتباسات والملاحظات الطويلة',
+    nameEn: 'Long Notes & Snippet Extractor',
+    descriptionAr: 'حفظ النصوص الطويلة، الأشعار، والمقتطفات مع استخراج الكبسولات الذكية',
+    descriptionEn: 'Long-form note drafting and AI smart snippet extraction',
+    category: 'saved_tools',
+    icon: 'FileText',
+    targetAudience: 'everyone',
+    specificUsers: [],
+    allowedPlans: ['all'],
+    progressiveDisclosure: { enabled: false, minAccountAgeDays: 0, minMessagesSent: 0, minCompletedTasks: 0 },
+    timeWindow: { enabled: false },
+    lockedBehavior: 'badge_lock',
+  },
+  {
+    id: 'feature_smart_alarm',
+    nameAr: 'المنبه والتذكيرات الصوتية التفاعلية',
+    nameEn: 'Smart Interactive Alarms',
+    descriptionAr: 'تنبيهات صوتية فورية مع أصوات رنين وتنبيه تفاعلي',
+    descriptionEn: 'Full screen ringing alarms and persistent reminder notifications',
+    category: 'saved_tools',
+    icon: 'Bell',
+    targetAudience: 'everyone',
+    specificUsers: [],
+    allowedPlans: ['all'],
+    progressiveDisclosure: { enabled: false, minAccountAgeDays: 0, minMessagesSent: 0, minCompletedTasks: 0 },
+    timeWindow: { enabled: false },
+    lockedBehavior: 'hide',
+  },
+  {
+    id: 'tool_daily_checkin',
+    nameAr: 'رسالة التفقد والاطمئنان اليومي',
+    nameEn: 'Daily Wellness Check-in',
+    descriptionAr: 'سؤال يومي ذكي لمتابعة المزاج والطاقة ومستوى الإنتاجية',
+    descriptionEn: 'Daily proactive prompt to track mood, energy, and habits',
+    category: 'chat_tools',
+    icon: 'Smile',
+    targetAudience: 'everyone',
+    specificUsers: [],
+    allowedPlans: ['all'],
+    progressiveDisclosure: { enabled: false, minAccountAgeDays: 0, minMessagesSent: 0, minCompletedTasks: 0 },
+    timeWindow: { enabled: false },
+    lockedBehavior: 'hide',
+  },
+  {
+    id: 'tool_daily_review',
+    nameAr: 'توليد ملخص ومراجعة اليوم بالذكاء الاصطناعي',
+    nameEn: 'AI Daily Summary Review',
+    descriptionAr: 'تقرير مسائي شامل يحلل إنجازات اليوم ونقاط التحسين',
+    descriptionEn: 'End-of-day AI comprehensive debrief and performance score',
+    category: 'actions',
+    icon: 'Sparkles',
+    targetAudience: 'everyone',
+    specificUsers: [],
+    allowedPlans: ['all'],
+    progressiveDisclosure: { enabled: false, minAccountAgeDays: 0, minMessagesSent: 0, minCompletedTasks: 0 },
+    timeWindow: { enabled: false },
+    lockedBehavior: 'badge_lock',
+  },
+  {
+    id: 'feature_theme_customization',
+    nameAr: 'تخصيص الثيمات والوضع الليلي',
+    nameEn: 'Theme & Appearance Customizer',
+    descriptionAr: 'التبديل بين المظهر الفاتح والداكن والخطوط',
+    descriptionEn: 'Dark/Light mode switches and UI styling preferences',
+    category: 'preferences',
+    icon: 'Palette',
+    targetAudience: 'everyone',
+    specificUsers: [],
+    allowedPlans: ['all'],
+    progressiveDisclosure: { enabled: false, minAccountAgeDays: 0, minMessagesSent: 0, minCompletedTasks: 0 },
+    timeWindow: { enabled: false },
+    lockedBehavior: 'hide',
+  },
+];
 
 const defaultDatabase: DatabaseSchema = {
   users: [
@@ -300,6 +592,7 @@ const defaultDatabase: DatabaseSchema = {
         updatedAt: new Date().toISOString(),
       },
     ],
+    features: defaultFeaturesList,
   },
 };
 
@@ -332,11 +625,20 @@ class Database {
       const finalAdminEmail = process.env.ADMIN_EMAIL || process.env.SUPER_ADMIN_EMAIL || loadedSettings.superAdminEmail || 'admin@rafiq.ai';
       const finalAdminPassword = process.env.ADMIN_PASSWORD || process.env.SUPER_ADMIN_PASSWORD || loadedSettings.superAdminPassword || 'AdminSecret2026!';
 
+      const mergedFeatures = defaultFeaturesList.map((defaultFeat) => {
+        const found = (loadedSettings.features || []).find((f) => f.id === defaultFeat.id);
+        return found ? { ...defaultFeat, ...found } : defaultFeat;
+      });
+      const customFeatures = (loadedSettings.features || []).filter(
+        (f) => !defaultFeaturesList.some((df) => df.id === f.id)
+      );
+
       const mergedSettings: SystemSettingsEntity = {
         ...defaultDatabase.settings,
         ...loadedSettings,
         superAdminEmail: finalAdminEmail,
         superAdminPassword: finalAdminPassword,
+        features: [...mergedFeatures, ...customFeatures],
       };
 
       const finalDb: DatabaseSchema = {
@@ -561,6 +863,240 @@ class Database {
     this.data.settings.paymentMethods = this.data.settings.paymentMethods.filter((p) => p.id !== id);
     (this.data.settings as any).updatedAt = new Date().toISOString();
     this.save();
+  }
+
+  // Feature Management & Rule Engine Methods
+  public getFeatures(): FeatureRuleConfig[] {
+    return this.data.settings.features || defaultFeaturesList;
+  }
+
+  public findFeatureById(id: string): FeatureRuleConfig | undefined {
+    return (this.data.settings.features || defaultFeaturesList).find((f) => f.id === id);
+  }
+
+  public upsertFeature(feature: FeatureRuleConfig): FeatureRuleConfig {
+    if (!this.data.settings.features) {
+      this.data.settings.features = [...defaultFeaturesList];
+    }
+    const idx = this.data.settings.features.findIndex((f) => f.id === feature.id);
+    const updated = { ...feature, updatedAt: new Date().toISOString() };
+    if (idx >= 0) {
+      this.data.settings.features[idx] = updated;
+    } else {
+      this.data.settings.features.push(updated);
+    }
+    (this.data.settings as any).updatedAt = new Date().toISOString();
+    this.save();
+    return updated;
+  }
+
+  public updateAllFeatures(features: FeatureRuleConfig[]): FeatureRuleConfig[] {
+    this.data.settings.features = features.map((f) => ({ ...f, updatedAt: new Date().toISOString() }));
+    (this.data.settings as any).updatedAt = new Date().toISOString();
+    this.save();
+    return this.data.settings.features;
+  }
+
+  public evaluateFeatureForContext(
+    feature: FeatureRuleConfig,
+    context: {
+      userId?: string;
+      email?: string;
+      planId?: string;
+      accountCreatedAt?: string;
+      messagesCount?: number;
+      tasksCompletedCount?: number;
+    }
+  ): EvaluatedFeatureStatus {
+    const {
+      userId = '',
+      email = '',
+      planId = 'free',
+      accountCreatedAt,
+      messagesCount = 0,
+      tasksCompletedCount = 0,
+    } = context;
+
+    const isLoggedIn = Boolean(
+      (email && email.trim().length > 0) ||
+      (userId && userId.startsWith('USR-') && userId !== 'user_default_01')
+    );
+
+    // 1. Target Audience Evaluation
+    if (feature.targetAudience === 'disabled') {
+      return {
+        id: feature.id,
+        name: feature.nameAr,
+        icon: feature.icon,
+        enabled: false,
+        locked: true,
+        lockedBehavior: feature.lockedBehavior,
+        reason: 'disabled',
+        lockMessage: 'هذه الميزة معطلة حالياً للصيانة أو التطوير',
+      };
+    }
+
+    if (feature.targetAudience === 'specific_users') {
+      const allowedList = (feature.specificUsers || [])
+        .map((u) => u.toLowerCase().trim())
+        .filter(Boolean);
+      const userMatch =
+        (userId && allowedList.includes(userId.toLowerCase().trim())) ||
+        (email && allowedList.includes(email.toLowerCase().trim()));
+
+      if (!userMatch) {
+        return {
+          id: feature.id,
+          name: feature.nameAr,
+          icon: feature.icon,
+          enabled: false,
+          locked: true,
+          lockedBehavior: feature.lockedBehavior,
+          reason: 'specific_users_only',
+          lockMessage: feature.customLockMessage || 'هذه الميزة متاحة فقط لمستخدمين محددين تجريبياً',
+        };
+      }
+    }
+
+    if (feature.targetAudience === 'authenticated_only') {
+      if (!isLoggedIn) {
+        return {
+          id: feature.id,
+          name: feature.nameAr,
+          icon: feature.icon,
+          enabled: false,
+          locked: true,
+          lockedBehavior: feature.lockedBehavior,
+          reason: 'requires_auth',
+          lockMessage: feature.customLockMessage || 'يرجى تسجيل الدخول أو إنشاء حساب للوصول لهذه الميزة',
+        };
+      }
+    }
+
+    // 2. Plan Tier Requirement Evaluation
+    if (feature.allowedPlans && feature.allowedPlans.length > 0 && !feature.allowedPlans.includes('all')) {
+      if (!feature.allowedPlans.includes(planId)) {
+        return {
+          id: feature.id,
+          name: feature.nameAr,
+          icon: feature.icon,
+          enabled: false,
+          locked: true,
+          lockedBehavior: feature.lockedBehavior,
+          reason: 'plan_restricted',
+          lockMessage: feature.customLockMessage || `هذه الميزة تتطلب الاشتراك بإحدى الخطط المتقدمة (${feature.allowedPlans.join(' / ')})`,
+        };
+      }
+    }
+
+    // 3. Progressive Disclosure (Onboarding & Usage Thresholds)
+    if (feature.progressiveDisclosure && feature.progressiveDisclosure.enabled) {
+      if (feature.progressiveDisclosure.minAccountAgeDays > 0 && accountCreatedAt) {
+        const createdTime = new Date(accountCreatedAt).getTime();
+        const daysOld = (Date.now() - createdTime) / (1000 * 60 * 60 * 24);
+        if (daysOld < feature.progressiveDisclosure.minAccountAgeDays) {
+          const remainingDays = Math.ceil(feature.progressiveDisclosure.minAccountAgeDays - daysOld);
+          return {
+            id: feature.id,
+            name: feature.nameAr,
+            icon: feature.icon,
+            enabled: false,
+            locked: true,
+            lockedBehavior: feature.lockedBehavior,
+            reason: 'progressive_time_locked',
+            lockMessage: feature.customLockMessage || `ستفتح هذه الميزة بعد ${remainingDays} يوم من استخدامك المستمر للتطبيق ✨`,
+          };
+        }
+      }
+
+      if (feature.progressiveDisclosure.minMessagesSent > 0) {
+        if (messagesCount < feature.progressiveDisclosure.minMessagesSent) {
+          const needed = feature.progressiveDisclosure.minMessagesSent - messagesCount;
+          return {
+            id: feature.id,
+            name: feature.nameAr,
+            icon: feature.icon,
+            enabled: false,
+            locked: true,
+            lockedBehavior: feature.lockedBehavior,
+            reason: 'progressive_messages_locked',
+            lockMessage: feature.customLockMessage || `أرسل ${needed} رسائل إضافية لفتح هذه الميزة تلقائياً ✨`,
+          };
+        }
+      }
+
+      if (feature.progressiveDisclosure.minCompletedTasks > 0) {
+        if (tasksCompletedCount < feature.progressiveDisclosure.minCompletedTasks) {
+          const needed = feature.progressiveDisclosure.minCompletedTasks - tasksCompletedCount;
+          return {
+            id: feature.id,
+            name: feature.nameAr,
+            icon: feature.icon,
+            enabled: false,
+            locked: true,
+            lockedBehavior: feature.lockedBehavior,
+            reason: 'progressive_tasks_locked',
+            lockMessage: feature.customLockMessage || `أنجز ${needed} مهام إضافية لفتح هذه الأداة ✨`,
+          };
+        }
+      }
+    }
+
+    // 4. Time Window Evaluation
+    if (feature.timeWindow && feature.timeWindow.enabled) {
+      const now = Date.now();
+      if (feature.timeWindow.startDate && new Date(feature.timeWindow.startDate).getTime() > now) {
+        return {
+          id: feature.id,
+          name: feature.nameAr,
+          icon: feature.icon,
+          enabled: false,
+          locked: true,
+          lockedBehavior: feature.lockedBehavior,
+          reason: 'outside_time_window',
+          lockMessage: feature.customLockMessage || 'هذه الميزة ستبدأ قريباً في الموعد المحدد',
+        };
+      }
+      if (feature.timeWindow.endDate && new Date(feature.timeWindow.endDate).getTime() < now) {
+        return {
+          id: feature.id,
+          name: feature.nameAr,
+          icon: feature.icon,
+          enabled: false,
+          locked: true,
+          lockedBehavior: feature.lockedBehavior,
+          reason: 'outside_time_window',
+          lockMessage: feature.customLockMessage || 'انتهت الفترة المحددة لإتاحة هذه الميزة',
+        };
+      }
+    }
+
+    // All conditions passed
+    return {
+      id: feature.id,
+      name: feature.nameAr,
+      icon: feature.icon,
+      enabled: true,
+      locked: false,
+      lockedBehavior: feature.lockedBehavior,
+      reason: 'ok',
+    };
+  }
+
+  public evaluateAllFeatures(context: {
+    userId?: string;
+    email?: string;
+    planId?: string;
+    accountCreatedAt?: string;
+    messagesCount?: number;
+    tasksCompletedCount?: number;
+  }): Record<string, EvaluatedFeatureStatus> {
+    const features = this.getFeatures();
+    const result: Record<string, EvaluatedFeatureStatus> = {};
+    for (const f of features) {
+      result[f.id] = this.evaluateFeatureForContext(f, context);
+    }
+    return result;
   }
 }
 

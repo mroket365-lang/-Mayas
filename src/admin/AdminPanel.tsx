@@ -12,6 +12,7 @@ import {
   LogOut,
   Sparkles,
   ArrowRight,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { AdminLogin } from './AdminLogin';
 import { AdminDashboardView } from './AdminDashboardView';
@@ -19,6 +20,7 @@ import { AdminUsersView } from './AdminUsersView';
 import { AdminSubscriptionsView } from './AdminSubscriptionsView';
 import { AdminPaymentMethodsView } from './AdminPaymentMethodsView';
 import { AdminPlansView } from './AdminPlansView';
+import { AdminFeaturesView } from './AdminFeaturesView';
 import { AdminAIUsageView } from './AdminAIUsageView';
 import { AdminProvidersView } from './AdminProvidersView';
 import { AdminAuditLogsView } from './AdminAuditLogsView';
@@ -77,6 +79,7 @@ export const AdminPanel: React.FC = () => {
 
   const navItems = [
     { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
+    { id: 'features', label: 'إدارة الميزات والواجهات', icon: SlidersHorizontal },
     { id: 'users', label: 'المستخدمون', icon: Users },
     { id: 'subscriptions', label: 'الاشتراكات', icon: CreditCard },
     { id: 'payment_methods', label: 'طرق الدفع', icon: Wallet },
@@ -156,6 +159,7 @@ export const AdminPanel: React.FC = () => {
         {activeTab === 'dashboard' && (
           <AdminDashboardView stats={stats} onNavigate={(tab) => setActiveTab(tab)} />
         )}
+        {activeTab === 'features' && <AdminFeaturesView token={token} />}
         {activeTab === 'users' && <AdminUsersView token={token} />}
         {activeTab === 'subscriptions' && <AdminSubscriptionsView token={token} />}
         {activeTab === 'payment_methods' && <AdminPaymentMethodsView token={token} />}

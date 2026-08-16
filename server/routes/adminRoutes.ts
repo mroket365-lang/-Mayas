@@ -756,3 +756,139 @@ adminRouter.delete('/payment-methods/:id', requireAdminAuth, requireSuperAdmin, 
 
   return res.json({ success: true, message: 'تم حذف طريقة الدفع بنجاح' });
 });
+
+// ==========================================
+// 8. Dynamic Feature Management & Entitlements
+// ==========================================
+
+// Get all feature flags and rules
+adminRouter.get('/features', requireAdminAuth, (req: Request, res: Response) => {
+  const features = db.getFeatures();
+  return res.json(features);
+});
+
+// Update or configure a specific feature flag
+adminRouter.put('/features/:id', requireAdminAuth, (req: Request, res: Response) => {
+  const featureId = req.params.id;
+  const session = (req as any).adminSession;
+  const existing = db.findFeatureById(featureId);
+
+  if (!existing) {
+    return res.status(404).json({ error: 'الميزة المطلوبة غير موجودة في النظام' });
+  }
+
+  const {
+    nameAr,
+    nameEn,
+    descriptionAr,
+    descriptionEn,
+    category,
+    icon,
+    targetAudience,
+    specificUsers,
+    allowedPlans,
+    progressiveDisclosure,
+    timeWindow,
+    lockedBehavior,
+    customLockMessage,
+  } = req.body;
+
+  const updatedFeature = {
+    ...existing,
+    nameAr: nameAr !== undefined ? nameAr.trim() : existing.nameAr,
+    nameEn: nameEn !== undefined ? nameEn.trim() : existing.nameEn,
+    descriptionAr: descriptionAr !== undefined ? descriptionAr.trim() : existing.descriptionAr,
+    descriptionEn: descriptionEn !== undefined ? descriptionEn.trim() : existing.descriptionEn,
+    category: category || existing.category,
+    icon: icon || existing.icon,
+    targetAudience: targetAudience || existing.targetAudience,
+    specificUsers: Array.isArray(specificUsers)
+      ? specificUsers.map((s: string) => s.trim().toLowerCase()).filter(Boolean)
+      : existing.specificUsers,
+    allowedPlans: Array.isArray(allowedPlans) ? allowedPlans : existing.allowedPlans,
+    progressiveDisclosure: progressiveDisclosure
+      ? {
+          enabled: Boolean(progressiveDisclosure.enabled),
+          minAccountAgeDays: Number(progressiveDisclosure.minAccountAgeDays) || 0,
+          minMessagesSent: Number(progressiveDisclosure.minMessagesSent) || 0,
+          minCompletedTasks: Number(progressiveDisclosure.minCompletedTasks) || 0,
+        }
+      : existing.progressiveDisclosure,
+    timeWindow: timeWindow
+      ? {
+          enabled: Boolean(timeWindow.enabled),
+          startDate: timeWindow.startDate || null,
+          endDate: timeWindow.endDate || null,
+        }
+      : existing.timeWindow,
+    lockedBehavior: lockedBehavior || existing.lockedBehavior,
+    customLockMessage: customLockMessage !== undefined ? customLockMessage.trim() : existing.customLockMessage,
+    updatedAt: new Date().toISOString(),
+  };
+
+  db.upsertFeature(updatedFeature);
+
+  db.addAuditLog({
+    adminId: session.adminId,
+    adminEmail: session.email,
+    action: 'UPDATE_FEATURE_RULE',
+    details: `Updated rule for feature '${updatedFeature.nameAr}' (${featureId}) -> Audience: ${updatedFeature.targetAudience}, Plans: ${updatedFeature.allowedPlans?.join(',') || 'all'}.`,
+  });
+
+  // Broadcast real-time sync across connected users
+  realtimeSyncService.broadcast('features_updated', {
+    feature: updatedFeature,
+    allFeatures: db.getFeatures(),
+    timestamp: Date.now(),
+  });
+
+  return res.json(updatedFeature);
+});
+
+// Reset all features to factory defaults
+adminRouter.post('/features/reset-defaults', requireAdminAuth, requireSuperAdmin, (req: Request, res: Response) => {
+  const session = (req as any).adminSession;
+  const resetList = db.updateAllFeatures(db.getFeatures().map((f) => {
+    return {
+      ...f,
+      targetAudience: 'everyone',
+      specificUsers: [],
+      allowedPlans: ['all'],
+      progressiveDisclosure: { enabled: false, minAccountAgeDays: 0, minMessagesSent: 0, minCompletedTasks: 0 },
+      timeWindow: { enabled: false, startDate: null, endDate: null },
+      lockedBehavior: 'badge_lock',
+    };
+  }));
+
+  db.addAuditLog({
+    adminId: session.adminId,
+    adminEmail: session.email,
+    action: 'RESET_FEATURE_RULES',
+    details: 'Reset all feature rules to factory defaults (Available to everyone).',
+  });
+
+  realtimeSyncService.broadcast('features_updated', {
+    allFeatures: resetList,
+    timestamp: Date.now(),
+  });
+
+  return res.json({ success: true, features: resetList });
+});
+
+// Simulator endpoint: Test how features are evaluated for any hypothetical user context
+adminRouter.post('/features/simulate', requireAdminAuth, (req: Request, res: Response) => {
+  const { userId, email, planId, accountCreatedAt, messagesCount, tasksCompletedCount } = req.body;
+  const evaluated = db.evaluateAllFeatures({
+    userId,
+    email,
+    planId: planId || 'free',
+    accountCreatedAt,
+    messagesCount: Number(messagesCount) || 0,
+    tasksCompletedCount: Number(tasksCompletedCount) || 0,
+  });
+
+  return res.json({
+    context: { userId, email, planId, accountCreatedAt, messagesCount, tasksCompletedCount },
+    evaluation: evaluated,
+  });
+});

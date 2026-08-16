@@ -21,6 +21,7 @@ import { AuthModal } from './components/AuthModal';
 import { DailyCheckInModal } from './components/DailyCheckInModal';
 import { AdminPanel } from './admin/AdminPanel';
 import { realtimeClient } from './services/realtimeClient';
+import { FeatureGateProvider } from './context/FeatureGateContext';
 
 export interface SystemPublicSettings {
   maintenanceMode: boolean;
@@ -444,25 +445,33 @@ export default function App() {
   };
 
   return (
-    <div className="h-dvh flex flex-col bg-[var(--bg-main)] text-[var(--text-main)] transition-colors max-w-full overflow-hidden relative">
-      {/* Real-time System Maintenance Overlay */}
-      {systemSettings?.maintenanceMode && (
-        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md text-white flex flex-col items-center justify-center p-6 text-center animate-fade-in">
-          <div className="p-4 rounded-3xl bg-amber-500/20 border border-amber-500/40 text-amber-400 mb-4 animate-bounce">
-            <AlertTriangle className="w-12 h-12" />
+    <FeatureGateProvider
+      profile={profile}
+      items={items}
+      messages={messages}
+      currentPlanId={profile.planTier || 'free'}
+      onOpenSubscription={() => setIsSubscriptionOpen(true)}
+      onOpenAuth={() => setIsAuthOpen(true)}
+    >
+      <div className="h-dvh flex flex-col bg-[var(--bg-main)] text-[var(--text-main)] transition-colors max-w-full overflow-hidden relative">
+        {/* Real-time System Maintenance Overlay */}
+        {systemSettings?.maintenanceMode && (
+          <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md text-white flex flex-col items-center justify-center p-6 text-center animate-fade-in">
+            <div className="p-4 rounded-3xl bg-amber-500/20 border border-amber-500/40 text-amber-400 mb-4 animate-bounce">
+              <AlertTriangle className="w-12 h-12" />
+            </div>
+            <h2 className="text-2xl font-black mb-2">النظام في حالة صيانة مؤقتة</h2>
+            <p className="text-slate-300 max-w-md text-sm mb-6">
+              يقوم فريق الإدارة بتحديث الخدمات في لوحة التحكم حالياً. ستعمل المنصة وتتزامن تلقائياً فور انتهاء التعديلات خلال لحظات.
+            </p>
+            <div className="px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-slate-400 font-mono flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+              <span>جاري المزامنة التلقائية مع لوحة التحكم (&lt; 10 ثوانٍ)...</span>
+            </div>
           </div>
-          <h2 className="text-2xl font-black mb-2">النظام في حالة صيانة مؤقتة</h2>
-          <p className="text-slate-300 max-w-md text-sm mb-6">
-            يقوم فريق الإدارة بتحديث الخدمات في لوحة التحكم حالياً. ستعمل المنصة وتتزامن تلقائياً فور انتهاء التعديلات خلال لحظات.
-          </p>
-          <div className="px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-slate-400 font-mono flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-            <span>جاري المزامنة التلقائية مع لوحة التحكم (&lt; 10 ثوانٍ)...</span>
-          </div>
-        </div>
-      )}
+        )}
 
-      <Header
+        <Header
         profile={profile}
         onUpdateProfile={handleUpdateProfile}
         onOpenSettings={() => setIsSettingsOpen(true)}
@@ -704,6 +713,7 @@ export default function App() {
           onDismiss={() => setRingingAlarm(null)}
         />
       )}
-    </div>
+      </div>
+    </FeatureGateProvider>
   );
 }

@@ -97,6 +97,21 @@ async function startServer() {
     const privateCandidAllowed = evaluateFeature(settings.privateCandidVisibility);
     const maritalSupportAllowed = evaluateFeature(settings.maritalSupportVisibility);
 
+    // Dynamic Feature Evaluation for client context
+    const planId = (req.query.planId as string) || 'free';
+    const accountCreatedAt = (req.query.accountCreatedAt as string) || undefined;
+    const messagesCount = Number(req.query.messagesCount) || 0;
+    const tasksCompletedCount = Number(req.query.tasksCompletedCount) || 0;
+
+    const evaluatedFeatures = db.evaluateAllFeatures({
+      userId,
+      email,
+      planId,
+      accountCreatedAt,
+      messagesCount,
+      tasksCompletedCount,
+    });
+
     return res.json({
       maintenanceMode: Boolean(settings.maintenanceMode),
       newRegistrationsEnabled: Boolean(settings.newRegistrationsEnabled),
@@ -106,11 +121,30 @@ async function startServer() {
       maritalSupportAllowed,
       privateCandidMode: settings.privateCandidVisibility?.mode || 'hidden',
       maritalSupportMode: settings.maritalSupportVisibility?.mode || 'hidden',
+      features: db.getFeatures(),
+      evaluatedFeatures,
       updatedAt: (settings as any).updatedAt || new Date().toISOString(),
       plans: db.getPlans().filter((p) => p.active),
       paymentMethods: (settings.paymentMethods || []).filter((p) => p.enabled),
       googleClientId: process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '',
       resendConfigured: Boolean(process.env.RESEND_API_KEY || process.env.RESEND_KEY || process.env.VITE_RESEND_API_KEY),
+    });
+  });
+
+  // Dedicated dynamic feature evaluation endpoint
+  app.post('/api/public/features/evaluate', (req, res) => {
+    const { userId, email, planId, accountCreatedAt, messagesCount, tasksCompletedCount } = req.body;
+    const evaluatedFeatures = db.evaluateAllFeatures({
+      userId,
+      email,
+      planId: planId || 'free',
+      accountCreatedAt,
+      messagesCount: Number(messagesCount) || 0,
+      tasksCompletedCount: Number(tasksCompletedCount) || 0,
+    });
+    return res.json({
+      features: db.getFeatures(),
+      evaluatedFeatures,
     });
   });
 

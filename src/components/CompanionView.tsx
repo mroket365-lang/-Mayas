@@ -27,11 +27,13 @@ import {
   Plus,
   FileText,
   AlertCircle,
+  Lock,
 } from 'lucide-react';
 import { speechService } from '../services/speechService';
 import { AudioWaveform } from './AudioWaveform';
 import { SnippetExtractorModal } from './SnippetExtractorModal';
 import { GuestBanner } from './GuestBanner';
+import { useFeatureGate } from '../context/FeatureGateContext';
 
 interface CompanionViewProps {
   messages: ChatMessage[];
@@ -236,6 +238,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
   const [micPermissionError, setMicPermissionError] = useState(false);
   const [isGuestBannerDismissed, setIsGuestBannerDismissed] = useState(false);
+  const { isFeatureEnabled, isFeatureVisible, triggerLockedPrompt } = useFeatureGate();
 
   // MediaRecorder & Navigation refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -845,25 +848,51 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
                 )}
               </div>
             ) : (
-              /* When NOT typing (inputText is empty), show default Paperclip & Mic buttons */
+              /* When NOT typing (inputText is empty), show Paperclip & Mic buttons if allowed */
               <>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="p-2.5 sm:p-3 rounded-2xl bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-sage)] transition-all shrink-0 mb-0.5"
-                  title={t.attachMedia}
-                >
-                  <Paperclip className="w-5 h-5" />
-                </button>
+                {isFeatureVisible('chat_attachment') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isFeatureEnabled('chat_attachment')) {
+                        triggerLockedPrompt('chat_attachment');
+                        return;
+                      }
+                      fileInputRef.current?.click();
+                    }}
+                    className="relative p-2.5 sm:p-3 rounded-2xl bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-sage)] transition-all shrink-0 mb-0.5"
+                    title={t.attachMedia}
+                  >
+                    <Paperclip className="w-5 h-5" />
+                    {!isFeatureEnabled('chat_attachment') && (
+                      <div className="absolute -top-1 -end-1 bg-amber-500 text-white rounded-full p-0.5 shadow-sm">
+                        <Lock className="w-2.5 h-2.5" />
+                      </div>
+                    )}
+                  </button>
+                )}
 
-                <button
-                  type="button"
-                  onClick={startVoiceInteraction}
-                  className="p-2.5 sm:p-3 rounded-2xl bg-[var(--bg-hover)] text-[var(--accent-sage)] hover:bg-[var(--accent-sage)]/10 transition-all shadow-sm shrink-0 mb-0.5"
-                  title={t.voiceMode}
-                >
-                  <Mic className="w-5 h-5" />
-                </button>
+                {isFeatureVisible('chat_voice') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isFeatureEnabled('chat_voice')) {
+                        triggerLockedPrompt('chat_voice');
+                        return;
+                      }
+                      startVoiceInteraction();
+                    }}
+                    className="relative p-2.5 sm:p-3 rounded-2xl bg-[var(--bg-hover)] text-[var(--accent-sage)] hover:bg-[var(--accent-sage)]/10 transition-all shadow-sm shrink-0 mb-0.5"
+                    title={t.voiceMode}
+                  >
+                    <Mic className="w-5 h-5" />
+                    {!isFeatureEnabled('chat_voice') && (
+                      <div className="absolute -top-1 -end-1 bg-amber-500 text-white rounded-full p-0.5 shadow-sm">
+                        <Lock className="w-2.5 h-2.5" />
+                      </div>
+                    )}
+                  </button>
+                )}
               </>
             )}
 

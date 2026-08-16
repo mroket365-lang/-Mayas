@@ -180,6 +180,52 @@ export interface FeatureFlagConfig {
   allowedRegion?: string;
 }
 
+export type FeatureCategory = 'tabs' | 'actions' | 'chat_tools' | 'saved_tools' | 'preferences' | 'ai_modules';
+export type FeatureAudience = 'everyone' | 'authenticated_only' | 'specific_users' | 'disabled';
+export type FeatureLockedBehavior = 'hide' | 'badge_lock';
+
+export interface ProgressiveDisclosureConfig {
+  enabled: boolean;
+  minAccountAgeDays: number;
+  minMessagesSent: number;
+  minCompletedTasks: number;
+}
+
+export interface FeatureTimeWindowConfig {
+  enabled: boolean;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
+export interface FeatureRuleConfig {
+  id: string;
+  nameAr: string;
+  nameEn: string;
+  descriptionAr: string;
+  descriptionEn: string;
+  category: FeatureCategory;
+  icon: string;
+  targetAudience: FeatureAudience;
+  specificUsers: string[];
+  allowedPlans: string[]; // ['free', 'premium', 'pro'] or ['all']
+  progressiveDisclosure: ProgressiveDisclosureConfig;
+  timeWindow: FeatureTimeWindowConfig;
+  lockedBehavior: FeatureLockedBehavior;
+  customLockMessage?: string;
+  updatedAt?: string;
+}
+
+export interface EvaluatedFeatureStatus {
+  id: string;
+  enabled: boolean;
+  locked: boolean;
+  lockedBehavior: FeatureLockedBehavior;
+  reason?: 'disabled' | 'specific_users_only' | 'requires_auth' | 'plan_restricted' | 'progressive_time_locked' | 'progressive_messages_locked' | 'progressive_tasks_locked' | 'outside_time_window' | 'ok';
+  lockMessage?: string;
+  name: string;
+  icon: string;
+}
+
 export interface SystemFeaturePermissions {
   privateCandidAllowed: boolean;
   maritalSupportAllowed: boolean;
