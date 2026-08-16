@@ -99,6 +99,38 @@ class RealtimeSyncService {
     }
   }
 
+  public broadcastToUser(userId: string, email: string, eventType: string, payload: any): void {
+    const targetUid = (userId || '').toLowerCase().trim();
+    const targetEmail = (email || '').toLowerCase().trim();
+    const now = Date.now();
+
+    for (const [clientId, client] of this.clients.entries()) {
+      const clientUid = (client.userId || '').toLowerCase().trim();
+      const clientEmail = (client.email || '').toLowerCase().trim();
+
+      const isMatch = (targetUid && clientUid === targetUid) ||
+                      (targetEmail && clientEmail === targetEmail) ||
+                      (targetUid && clientEmail === targetUid) ||
+                      (targetEmail && clientUid === targetEmail);
+
+      if (isMatch) {
+        try {
+          const eventData = {
+            type: eventType,
+            timestamp: now,
+            data: payload,
+          };
+          client.res.write(`event: ${eventType}\n`);
+          client.res.write(`data: ${JSON.stringify(eventData)}\n\n`);
+          client.res.write(`event: message\n`);
+          client.res.write(`data: ${JSON.stringify(eventData)}\n\n`);
+        } catch (err) {
+          this.clients.delete(clientId);
+        }
+      }
+    }
+  }
+
   private sendToClient(client: SSEClient, eventType: string, data: any): void {
     try {
       client.res.write(`event: ${eventType}\n`);

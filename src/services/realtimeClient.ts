@@ -100,6 +100,9 @@ class RealtimeClient {
         'user_updated',
         'providers_updated',
         'user_usage_reset',
+        'user_data_synced',
+        'user_profile_updated',
+        'user_chat_sync',
       ];
 
       eventNames.forEach((evName) => {

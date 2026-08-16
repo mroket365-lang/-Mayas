@@ -160,9 +160,103 @@ async function startServer() {
     res.json({ status: 'ok', app: 'Rafiq AI Companion', timestamp: new Date().toISOString() });
   });
 
+  // Helper to persist user chat and items server-side and broadcast to other devices
+  const autoSyncUserDataOnServer = (
+    profile: any,
+    userMessageText?: string,
+    aiReplyText?: string,
+    actions?: any[],
+    createdOrUpdatedItems?: any[],
+    updatedProfile?: any,
+    mediaInfo?: { url?: string; type?: string; name?: string }
+  ) => {
+    if (!profile) return;
+    const uid = profile.id;
+    const email = profile.email;
+    if (!uid && !email) return;
+    if (uid === 'user_default_01' && !email) return;
+
+    let user = uid ? db.findUserById(uid) : undefined;
+    if (!user && email) {
+      user = db.findUserByEmail(email);
+    }
+    if (!user) return;
+
+    const nowIso = new Date().toISOString();
+    const newUserMsg = userMessageText
+      ? {
+          id: 'msg_u_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+          sender: 'user',
+          text: userMessageText,
+          timestamp: nowIso,
+          mediaUrl: mediaInfo?.url,
+          mediaType: mediaInfo?.type,
+          mediaName: mediaInfo?.name,
+        }
+      : null;
+
+    const newAiMsg = aiReplyText
+      ? {
+          id: 'msg_a_' + (Date.now() + 10) + '_' + Math.random().toString(36).substring(2, 6),
+          sender: 'ai',
+          text: aiReplyText,
+          timestamp: new Date(Date.now() + 20).toISOString(),
+          actionsTaken: actions || [],
+        }
+      : null;
+
+    if (newUserMsg || newAiMsg) {
+      const existing: any[] = Array.isArray(user.messagesData) ? user.messagesData : [];
+      const msgMap = new Map<string, any>();
+      existing.forEach((m) => {
+        if (m?.id) msgMap.set(m.id, m);
+      });
+      if (newUserMsg) msgMap.set(newUserMsg.id, newUserMsg);
+      if (newAiMsg) msgMap.set(newAiMsg.id, newAiMsg);
+      const sorted = Array.from(msgMap.values()).sort(
+        (a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
+      );
+      user.messagesData = sorted.slice(-200);
+    }
+
+    if (Array.isArray(createdOrUpdatedItems) && createdOrUpdatedItems.length > 0) {
+      const existingItems: any[] = Array.isArray(user.itemsData) ? user.itemsData : [];
+      const itemMap = new Map<string, any>();
+      existingItems.forEach((it) => {
+        if (it?.id) itemMap.set(it.id, it);
+      });
+      createdOrUpdatedItems.forEach((it) => {
+        if (it?.id) itemMap.set(it.id, { ...(itemMap.get(it.id) || {}), ...it });
+      });
+      user.itemsData = Array.from(itemMap.values());
+    }
+
+    if (updatedProfile && typeof updatedProfile === 'object') {
+      user.profileData = {
+        ...(user.profileData || {}),
+        ...updatedProfile,
+      };
+    }
+
+    user.lastActiveAt = nowIso;
+    db.upsertUser(user);
+
+    // Broadcast chat update to other devices of the same user
+    realtimeSyncService.broadcastToUser(user.id, user.email, 'user_chat_sync', {
+      userId: user.id,
+      email: user.email,
+      newUserMessage: newUserMsg,
+      newAiMessage: newAiMsg,
+      createdOrUpdatedItems,
+      updatedProfile: user.profileData,
+      messagesData: user.messagesData,
+      itemsData: user.itemsData,
+    });
+  };
+
   app.post('/api/companion/chat-stream', async (req, res) => {
     try {
-      const { message, history, profile, items, mediaBase64, mediaMimeType, clientTimeContext } = req.body;
+      const { message, history, profile, items, mediaBase64, mediaMimeType, clientTimeContext, mediaUrl, mediaType, mediaName } = req.body;
       if (!message && !mediaBase64) {
         return res.status(400).json({ error: 'Message or media parameter is required' });
       }
@@ -184,6 +278,21 @@ async function startServer() {
         mediaMimeType,
         clientTimeContext
       );
+
+      // Auto-save and sync to other devices
+      try {
+        autoSyncUserDataOnServer(
+          profile,
+          message,
+          result.replyText,
+          result.actions,
+          result.createdOrUpdatedItems,
+          result.updatedProfile,
+          { url: mediaUrl, type: mediaType, name: mediaName }
+        );
+      } catch (syncErr) {
+        console.warn('Chat stream auto sync error:', syncErr);
+      }
 
       res.write(`data: ${JSON.stringify({
         done: true,
@@ -207,7 +316,7 @@ async function startServer() {
 
   app.post('/api/companion/chat', async (req, res) => {
     try {
-      const { message, history, profile, items, mediaBase64, mediaMimeType, clientTimeContext } = req.body;
+      const { message, history, profile, items, mediaBase64, mediaMimeType, clientTimeContext, mediaUrl, mediaType, mediaName } = req.body;
       if (!message && !mediaBase64) {
         return res.status(400).json({ error: 'Message or media parameter is required' });
       }
@@ -221,6 +330,21 @@ async function startServer() {
         mediaMimeType,
         clientTimeContext
       );
+
+      // Auto-save and sync to other devices
+      try {
+        autoSyncUserDataOnServer(
+          profile,
+          message,
+          result.replyText,
+          result.actions,
+          result.createdOrUpdatedItems,
+          result.updatedProfile,
+          { url: mediaUrl, type: mediaType, name: mediaName }
+        );
+      } catch (syncErr) {
+        console.warn('Chat auto sync error:', syncErr);
+      }
 
       return res.json(result);
     } catch (error: unknown) {

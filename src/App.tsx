@@ -68,12 +68,181 @@ export default function App() {
     setMessages(emptyMessages);
   };
 
-  // Sub-second Real-Time System Settings & Variables Synchronization (< 1 second across all screens)
+  // Cloud User Data Fetcher (fetches latest authoritative data from server)
+  const fetchCloudUserData = useCallback(async (uid?: string, email?: string) => {
+    const targetUid = uid || profile.id;
+    const targetEmail = email || profile.email;
+    if (!targetUid && !targetEmail) return;
+    if (targetUid === 'user_default_01' && !targetEmail) return;
+
+    try {
+      const query = new URLSearchParams();
+      if (targetUid) query.set('userId', targetUid);
+      if (targetEmail) query.set('email', targetEmail);
+      query.set('_t', Date.now().toString());
+
+      const res = await fetch(`/api/user/data?${query.toString()}`, {
+        cache: 'no-store',
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success) {
+          if (json.profileData) {
+            setProfile((prev) => {
+              const merged: UserProfile = {
+                ...prev,
+                ...json.profileData,
+                id: json.user?.id || prev.id,
+                email: json.user?.email || prev.email,
+                displayName: json.profileData.displayName || json.profileData.name || json.user?.name || prev.displayName,
+                addressAs: json.profileData.addressAs || json.user?.addressAs || prev.addressAs,
+              };
+              storageService.saveProfile(merged);
+              return merged;
+            });
+          }
+          if (Array.isArray(json.messagesData) && json.messagesData.length > 0) {
+            setMessages((prev) => {
+              const msgMap = new Map<string, ChatMessage>();
+              prev.forEach((m) => { if (m?.id) msgMap.set(m.id, m); });
+              json.messagesData.forEach((m: ChatMessage) => { if (m?.id) msgMap.set(m.id, m); });
+              const merged = Array.from(msgMap.values()).sort(
+                (a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
+              );
+              storageService.saveMessages(merged);
+              return merged;
+            });
+          }
+          if (Array.isArray(json.itemsData) && json.itemsData.length > 0) {
+            setItems((prev) => {
+              const itemMap = new Map<string, CompanionItem>();
+              prev.forEach((it) => { if (it?.id) itemMap.set(it.id, it); });
+              json.itemsData.forEach((it: CompanionItem) => { if (it?.id) itemMap.set(it.id, it); });
+              const merged = Array.from(itemMap.values());
+              storageService.saveItems(merged);
+              return merged;
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Cloud sync fetch failed:', err);
+    }
+  }, [profile.id, profile.email]);
+
+  // Initial cloud sync on mount and when login ID changes
+  useEffect(() => {
+    if (profile.id && profile.id !== 'user_default_01') {
+      fetchCloudUserData(profile.id, profile.email);
+    }
+  }, [profile.id, profile.email, fetchCloudUserData]);
+
+  // Real-Time System Settings & Cross-Device User Synchronization
   useEffect(() => {
     realtimeClient.init(profile.id || 'user_default_01', profile.email || '');
 
-    const unsubscribe = realtimeClient.subscribe('settings', (settingsData: SystemPublicSettings) => {
+    // Settings subscription
+    const unsubSettings = realtimeClient.subscribe('settings', (settingsData: SystemPublicSettings) => {
       setSystemSettings(settingsData);
+    });
+
+    // Cross-device user data sync event
+    const unsubUserData = realtimeClient.subscribe('user_data_synced', (data: any) => {
+      if (!data) return;
+      if (data.profileData) {
+        setProfile((prev) => {
+          const merged: UserProfile = {
+            ...prev,
+            ...data.profileData,
+            id: prev.id,
+            email: prev.email,
+          };
+          storageService.saveProfile(merged);
+          return merged;
+        });
+      }
+      if (Array.isArray(data.messagesData)) {
+        setMessages((prev) => {
+          const msgMap = new Map<string, ChatMessage>();
+          prev.forEach((m) => { if (m?.id) msgMap.set(m.id, m); });
+          data.messagesData.forEach((m: ChatMessage) => { if (m?.id) msgMap.set(m.id, m); });
+          const merged = Array.from(msgMap.values()).sort(
+            (a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
+          );
+          storageService.saveMessages(merged);
+          return merged;
+        });
+      }
+      if (Array.isArray(data.itemsData)) {
+        setItems((prev) => {
+          const itemMap = new Map<string, CompanionItem>();
+          prev.forEach((it) => { if (it?.id) itemMap.set(it.id, it); });
+          data.itemsData.forEach((it: CompanionItem) => { if (it?.id) itemMap.set(it.id, it); });
+          const merged = Array.from(itemMap.values());
+          storageService.saveItems(merged);
+          return merged;
+        });
+      }
+    });
+
+    // Cross-device profile update event
+    const unsubProfile = realtimeClient.subscribe('user_profile_updated', (data: any) => {
+      const pData = data?.profile || data;
+      if (pData) {
+        setProfile((prev) => {
+          const merged: UserProfile = {
+            ...prev,
+            ...pData,
+            id: prev.id,
+            email: prev.email,
+          };
+          storageService.saveProfile(merged);
+          return merged;
+        });
+      }
+    });
+
+    // Cross-device chat sync event
+    const unsubChat = realtimeClient.subscribe('user_chat_sync', (data: any) => {
+      if (!data) return;
+      if (data.newUserMessage || data.newAiMessage) {
+        setMessages((prev) => {
+          const msgMap = new Map<string, ChatMessage>();
+          prev.forEach((m) => { if (m?.id) msgMap.set(m.id, m); });
+          if (data.newUserMessage?.id) msgMap.set(data.newUserMessage.id, data.newUserMessage);
+          if (data.newAiMessage?.id) msgMap.set(data.newAiMessage.id, data.newAiMessage);
+          if (Array.isArray(data.messagesData)) {
+            data.messagesData.forEach((m: ChatMessage) => { if (m?.id) msgMap.set(m.id, m); });
+          }
+          const merged = Array.from(msgMap.values()).sort(
+            (a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
+          );
+          storageService.saveMessages(merged);
+          return merged;
+        });
+      }
+      if (Array.isArray(data.createdOrUpdatedItems) && data.createdOrUpdatedItems.length > 0) {
+        setItems((prev) => {
+          const itemMap = new Map<string, CompanionItem>();
+          prev.forEach((it) => { if (it?.id) itemMap.set(it.id, it); });
+          data.createdOrUpdatedItems.forEach((it: CompanionItem) => { if (it?.id) itemMap.set(it.id, it); });
+          const merged = Array.from(itemMap.values());
+          storageService.saveItems(merged);
+          return merged;
+        });
+      }
+      if (data.updatedProfile) {
+        setProfile((prev) => {
+          const merged: UserProfile = {
+            ...prev,
+            ...data.updatedProfile,
+            id: prev.id,
+            email: prev.email,
+          };
+          storageService.saveProfile(merged);
+          return merged;
+        });
+      }
     });
 
     const handleCustomSync = (e: any) => {
@@ -82,13 +251,26 @@ export default function App() {
       }
     };
 
+    const handleFocusOrVisible = () => {
+      if (document.visibilityState === 'visible' && profile.id && profile.id !== 'user_default_01') {
+        fetchCloudUserData(profile.id, profile.email);
+      }
+    };
+
     window.addEventListener('system_settings_updated', handleCustomSync);
+    window.addEventListener('focus', handleFocusOrVisible);
+    window.addEventListener('visibilitychange', handleFocusOrVisible);
 
     return () => {
-      unsubscribe();
+      unsubSettings();
+      unsubUserData();
+      unsubProfile();
+      unsubChat();
       window.removeEventListener('system_settings_updated', handleCustomSync);
+      window.removeEventListener('focus', handleFocusOrVisible);
+      window.removeEventListener('visibilitychange', handleFocusOrVisible);
     };
-  }, [profile.id, profile.email]);
+  }, [profile.id, profile.email, fetchCloudUserData]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -158,6 +340,36 @@ export default function App() {
   const handleUpdateProfile = (updatedProfile: UserProfile) => {
     setProfile(updatedProfile);
     storageService.saveProfile(updatedProfile);
+
+    // If authenticated, immediately update profile on server and trigger real-time broadcast to all devices
+    if (updatedProfile.id && updatedProfile.id !== 'user_default_01') {
+      fetch('/api/user/update-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: updatedProfile.id,
+          email: updatedProfile.email,
+          name: updatedProfile.displayName,
+          displayName: updatedProfile.displayName,
+          addressAs: updatedProfile.addressAs,
+          personality: updatedProfile.personality,
+          companionGender: updatedProfile.companionGender,
+          language: updatedProfile.language,
+          theme: updatedProfile.theme,
+          timezone: updatedProfile.timeZone,
+          voiceSpeed: updatedProfile.voiceSpeed,
+          useEmojis: updatedProfile.useEmojis,
+          proactivityLevel: updatedProfile.proactivityLevel,
+          dailyMessageLimit: updatedProfile.dailyMessageLimit,
+          privateCandidMode: updatedProfile.privateCandidMode,
+          specialCounselingEnabled: updatedProfile.specialCounselingEnabled,
+          dailyCheckInEnabled: updatedProfile.dailyCheckInEnabled,
+          dailyCheckInTime: updatedProfile.dailyCheckInTime,
+        }),
+      }).catch((err) => {
+        console.warn('Real-time profile sync error:', err);
+      });
+    }
   };
 
   const handleAddItem = useCallback((newItem: CompanionItem) => {

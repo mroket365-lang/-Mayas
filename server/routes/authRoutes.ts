@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db, UserEntity } from '../db/database.js';
 import { EmailService } from '../services/emailService.js';
+import { realtimeSyncService } from '../services/realtimeSyncService.js';
 
 export const authRouter = Router();
 
@@ -380,27 +381,138 @@ const handleResetPassword = (req: Request, res: Response) => {
 authRouter.post('/reset-password', handleResetPassword);
 authRouter.post('/auth/reset-password', handleResetPassword);
 
-// POST /api/auth/sync or /api/sync
-const handleSync = (req: Request, res: Response) => {
-  const { userId, profileData, messagesData, itemsData } = req.body;
+// GET /api/user/data or /api/auth/me or /api/user/sync-data
+const handleGetUserData = (req: Request, res: Response) => {
+  const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+  const email = (req.query.email as string) || (req.headers['x-user-email'] as string);
 
-  if (!userId) {
-    return res.status(400).json({ error: 'User ID is required' });
+  if (!userId && !email) {
+    return res.status(400).json({ error: 'User ID or Email is required' });
   }
 
-  const user = db.findUserById(userId);
+  let user = userId ? db.findUserById(userId) : undefined;
+  if (!user && email) {
+    user = db.findUserByEmail(email);
+  }
+
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
   }
 
-  if (profileData) user.profileData = profileData;
-  if (messagesData) user.messagesData = messagesData;
-  if (itemsData) user.itemsData = itemsData;
+  return res.json({
+    success: true,
+    user: {
+      id: user.id,
+      accountId: user.id,
+      email: user.email,
+      name: user.name,
+      username: user.username,
+      phone: user.phone,
+      role: user.role,
+      status: user.status,
+      isEmailVerified: (user as any).isEmailVerified ?? true,
+      addressAs: (user as any).addressAs || user.profileData?.addressAs || 'يا غالي',
+    },
+    profileData: user.profileData || null,
+    messagesData: user.messagesData || [],
+    itemsData: user.itemsData || [],
+    lastActiveAt: user.lastActiveAt,
+  });
+};
+
+authRouter.get('/user/data', handleGetUserData);
+authRouter.get('/auth/me', handleGetUserData);
+authRouter.get('/user/sync-data', handleGetUserData);
+
+// POST /api/auth/sync or /api/sync
+const handleSync = (req: Request, res: Response) => {
+  const { userId, email, profileData, messagesData, itemsData } = req.body;
+
+  const targetId = userId || (req.headers['x-user-id'] as string);
+  const targetEmail = email || (req.headers['x-user-email'] as string);
+
+  if (!targetId && !targetEmail) {
+    return res.status(400).json({ error: 'User ID or Email is required' });
+  }
+
+  let user = targetId ? db.findUserById(targetId) : undefined;
+  if (!user && targetEmail) {
+    user = db.findUserByEmail(targetEmail);
+  }
+
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  // Update profile
+  if (profileData && typeof profileData === 'object') {
+    user.profileData = {
+      ...(user.profileData || {}),
+      ...profileData,
+    };
+    if (profileData.displayName) {
+      // Keep companion display name in profileData
+      user.profileData.displayName = profileData.displayName;
+    }
+    if (profileData.personality) {
+      user.profileData.personality = profileData.personality;
+    }
+    if (profileData.addressAs) {
+      (user as any).addressAs = profileData.addressAs;
+    }
+  }
+
+  // Smart merge messages: union by id, ordered by timestamp, keep last 200
+  if (Array.isArray(messagesData)) {
+    const existingMessages: any[] = Array.isArray(user.messagesData) ? user.messagesData : [];
+    const msgMap = new Map<string, any>();
+    existingMessages.forEach((m) => {
+      if (m && m.id) msgMap.set(m.id, m);
+    });
+    messagesData.forEach((m) => {
+      if (m && m.id) msgMap.set(m.id, { ...(msgMap.get(m.id) || {}), ...m });
+    });
+    const mergedList = Array.from(msgMap.values()).sort((a, b) => {
+      const ta = new Date(a.timestamp || 0).getTime();
+      const tb = new Date(b.timestamp || 0).getTime();
+      return ta - tb;
+    });
+    user.messagesData = mergedList.slice(-200);
+  }
+
+  // Smart merge items: union by id, latest updatedAt
+  if (Array.isArray(itemsData)) {
+    const existingItems: any[] = Array.isArray(user.itemsData) ? user.itemsData : [];
+    const itemMap = new Map<string, any>();
+    existingItems.forEach((it) => {
+      if (it && it.id) itemMap.set(it.id, it);
+    });
+    itemsData.forEach((it) => {
+      if (it && it.id) itemMap.set(it.id, { ...(itemMap.get(it.id) || {}), ...it });
+    });
+    user.itemsData = Array.from(itemMap.values());
+  }
 
   user.lastActiveAt = new Date().toISOString();
   db.upsertUser(user);
 
-  return res.json({ message: 'Data synchronized successfully' });
+  // Broadcast to other devices/tabs of this user in real time
+  realtimeSyncService.broadcastToUser(user.id, user.email, 'user_data_synced', {
+    userId: user.id,
+    email: user.email,
+    profileData: user.profileData,
+    messagesData: user.messagesData,
+    itemsData: user.itemsData,
+    updatedAt: user.lastActiveAt,
+  });
+
+  return res.json({
+    success: true,
+    message: 'Data synchronized successfully',
+    profileData: user.profileData,
+    messagesCount: (user.messagesData || []).length,
+    itemsCount: (user.itemsData || []).length,
+  });
 };
 
 authRouter.post('/sync', handleSync);
@@ -408,29 +520,54 @@ authRouter.post('/auth/sync', handleSync);
 
 // POST /api/user/update-profile or /api/auth/user/update-profile (Real-time Profile Updates and Synchronization)
 const handleUpdateProfile = (req: Request, res: Response) => {
-  const { userId, name, username, phone, addressAs, companionGender, language, theme, timezone } = req.body;
+  const {
+    userId,
+    name,
+    username,
+    phone,
+    addressAs,
+    displayName,
+    personality,
+    companionGender,
+    language,
+    theme,
+    timezone,
+    voiceSpeed,
+    useEmojis,
+    proactivityLevel,
+    dailyMessageLimit,
+    privateCandidMode,
+    specialCounselingEnabled,
+    dailyCheckInEnabled,
+    dailyCheckInTime,
+  } = req.body;
 
   if (!userId) {
     return res.status(400).json({ error: 'User ID is required' });
   }
 
   let user = db.findUserById(userId);
+  if (!user && req.body.email) {
+    user = db.findUserByEmail(req.body.email);
+  }
+
   if (!user) {
-    // If user is guest/not in db, simply return success without polluting admin panel with unregistered user
+    // If user is guest/not in db, simply return success
     return res.json({
       success: true,
-      message: 'تم تحديث تفضيلات الجلسة المحلية بنجاح',
+      message: 'تم تحديث تفضيلات الجلسة بنجاح',
       user: {
         id: userId,
         accountId: userId,
         name: name || 'ضيف زائر',
+        displayName: displayName || name,
         addressAs: addressAs || 'يا غالي',
         role: 'guest',
       },
     });
   }
 
-  // Only update formal account name if explicitly provided and not just modifying companion nickname
+  // Account level name
   if (name && name.trim()) {
     user.name = name.trim();
   }
@@ -440,17 +577,37 @@ const handleUpdateProfile = (req: Request, res: Response) => {
   if (language) user.locale = language;
   if (addressAs !== undefined) (user as any).addressAs = String(addressAs).trim();
 
-  user.lastActiveAt = new Date().toISOString();
+  // Full Companion Profile Data
   user.profileData = {
     ...(user.profileData || {}),
     name: user.name,
-    addressAs: addressAs !== undefined ? String(addressAs).trim() : user.profileData?.addressAs,
-    companionGender: companionGender || user.profileData?.companionGender,
-    language: language || user.profileData?.language,
-    theme: theme || user.profileData?.theme,
+    displayName: displayName !== undefined ? displayName : (user.profileData?.displayName || user.name),
+    addressAs: addressAs !== undefined ? String(addressAs).trim() : (user.profileData?.addressAs || (user as any).addressAs || 'يا غالي'),
+    personality: personality || user.profileData?.personality || 'close_friend',
+    companionGender: companionGender || user.profileData?.companionGender || 'female',
+    language: language || user.profileData?.language || 'ar',
+    theme: theme || user.profileData?.theme || 'light',
+    timeZone: timezone || user.profileData?.timeZone || 'Asia/Riyadh',
+    voiceSpeed: voiceSpeed !== undefined ? voiceSpeed : user.profileData?.voiceSpeed,
+    useEmojis: useEmojis !== undefined ? useEmojis : user.profileData?.useEmojis,
+    proactivityLevel: proactivityLevel || user.profileData?.proactivityLevel,
+    dailyMessageLimit: dailyMessageLimit || user.profileData?.dailyMessageLimit,
+    privateCandidMode: privateCandidMode !== undefined ? privateCandidMode : user.profileData?.privateCandidMode,
+    specialCounselingEnabled: specialCounselingEnabled !== undefined ? specialCounselingEnabled : user.profileData?.specialCounselingEnabled,
+    dailyCheckInEnabled: dailyCheckInEnabled !== undefined ? dailyCheckInEnabled : user.profileData?.dailyCheckInEnabled,
+    dailyCheckInTime: dailyCheckInTime !== undefined ? dailyCheckInTime : user.profileData?.dailyCheckInTime,
   };
 
+  user.lastActiveAt = new Date().toISOString();
   db.upsertUser(user);
+
+  // Broadcast real-time profile change to all open devices of this user
+  realtimeSyncService.broadcastToUser(user.id, user.email, 'user_profile_updated', {
+    userId: user.id,
+    email: user.email,
+    profile: user.profileData,
+    updatedAt: user.lastActiveAt,
+  });
 
   return res.json({
     success: true,
@@ -460,6 +617,7 @@ const handleUpdateProfile = (req: Request, res: Response) => {
       accountId: user.id,
       email: user.email,
       name: user.name,
+      displayName: user.profileData.displayName,
       addressAs: (user as any).addressAs || user.profileData?.addressAs || 'يا غالي',
       username: user.username,
       phone: user.phone,
@@ -467,6 +625,7 @@ const handleUpdateProfile = (req: Request, res: Response) => {
       isEmailVerified: (user as any).isEmailVerified ?? true,
       createdAt: user.createdAt,
     },
+    profileData: user.profileData,
   });
 };
 
