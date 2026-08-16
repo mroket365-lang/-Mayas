@@ -165,6 +165,11 @@ export interface PaymentMethodEntity {
   updatedAt: string;
 }
 
+export interface AuthMethodsConfig {
+  googleAuthEnabled: boolean;
+  emailPasswordEnabled: boolean;
+}
+
 export interface SystemSettingsEntity {
   maintenanceMode: boolean;
   newRegistrationsEnabled: boolean;
@@ -173,6 +178,7 @@ export interface SystemSettingsEntity {
   fallbackAIProvider: string;
   multiAIEnabled: boolean;
   voiceEnabled: boolean;
+  authMethods?: AuthMethodsConfig;
   providers: {
     gemini: { enabled: boolean; model: string };
     openai: { enabled: boolean; model: string };
@@ -549,6 +555,10 @@ const defaultDatabase: DatabaseSchema = {
     fallbackAIProvider: 'openai',
     multiAIEnabled: true,
     voiceEnabled: true,
+    authMethods: {
+      googleAuthEnabled: true,
+      emailPasswordEnabled: false, // Default to Google-only as requested
+    },
     providers: {
       gemini: { enabled: true, model: 'gemini-3.7-flash' },
       openai: { enabled: true, model: 'gpt-4o-mini' },
@@ -636,6 +646,10 @@ class Database {
       const mergedSettings: SystemSettingsEntity = {
         ...defaultDatabase.settings,
         ...loadedSettings,
+        authMethods: {
+          googleAuthEnabled: loadedSettings.authMethods?.googleAuthEnabled !== undefined ? loadedSettings.authMethods.googleAuthEnabled : true,
+          emailPasswordEnabled: loadedSettings.authMethods?.emailPasswordEnabled !== undefined ? loadedSettings.authMethods.emailPasswordEnabled : false,
+        },
         superAdminEmail: finalAdminEmail,
         superAdminPassword: finalAdminPassword,
         features: [...mergedFeatures, ...customFeatures],

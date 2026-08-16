@@ -2,12 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { Settings, ShieldAlert, CheckCircle2, Save, RefreshCw, KeyRound, Eye, Lock, UserCheck, HeartHandshake } from 'lucide-react';
 import { FeatureFlagConfig } from '../types';
 
+interface AuthMethodsConfig {
+  googleAuthEnabled: boolean;
+  emailPasswordEnabled: boolean;
+}
+
 interface SystemSettings {
   maintenanceMode: boolean;
   newRegistrationsEnabled: boolean;
   defaultPlan: string;
   multiAIEnabled: boolean;
   voiceEnabled: boolean;
+  authMethods?: AuthMethodsConfig;
   privateCandidVisibility?: FeatureFlagConfig;
   maritalSupportVisibility?: FeatureFlagConfig;
 }
@@ -380,6 +386,71 @@ export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({ token }) =
                   />
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* Authentication Methods Control */}
+        <div className="space-y-4 pt-2 border-t border-slate-800">
+          <h3 className="font-bold text-white text-sm flex items-center gap-2">
+            <KeyRound className="w-4 h-4 text-emerald-400" />
+            <span>طرق تسجيل الدخول وإنشاء الحسابات المعتمدة (Authentication Methods)</span>
+          </h3>
+          <p className="text-slate-400 text-xs">
+            يمكنك تفعيل أو تعطيل أي وسيلة تسجيل دخول. عند تعطيل التسجيل بالبريد وكلمة المرور، يصبح النظام مقتصراً على تسجيل الدخول الموثق بحساب جوجل مباشرة.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Google OAuth Option */}
+            <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-white flex items-center gap-1.5">
+                  <span>🌐 تسجيل الدخول عبر حساب جوجل (Google OAuth)</span>
+                </p>
+                <p className="text-slate-400 text-[11px] mt-0.5">
+                  السماح بتسجيل الدخول وإنشاء الحساب بنقرة واحدة عبر حساب Google الرسمي
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={settings.authMethods?.googleAuthEnabled !== false}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    authMethods: {
+                      googleAuthEnabled: e.target.checked,
+                      emailPasswordEnabled: Boolean(settings.authMethods?.emailPasswordEnabled),
+                    },
+                  })
+                }
+                className="w-5 h-5 accent-emerald-500 rounded cursor-pointer"
+              />
+            </div>
+
+            {/* Email & Password Option */}
+            <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-white flex items-center gap-1.5">
+                  <span>✉️ التسجيل اليدوي بالبريد وكلمة السر (Email / Password)</span>
+                </p>
+                <p className="text-slate-400 text-[11px] mt-0.5">
+                  السماح بإنشاء حساب يدوي واستقبال رمز التحقق وتعيين كلمة المرور
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={Boolean(settings.authMethods?.emailPasswordEnabled)}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    authMethods: {
+                      googleAuthEnabled: settings.authMethods?.googleAuthEnabled !== false,
+                      emailPasswordEnabled: e.target.checked,
+                    },
+                  })
+                }
+                className="w-5 h-5 accent-indigo-600 rounded cursor-pointer"
+              />
             </div>
           </div>
         </div>

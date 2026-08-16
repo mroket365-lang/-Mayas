@@ -13,6 +13,14 @@ function generateAccountId(): string {
 
 // POST /api/register or /api/auth/register
 const handleRegister = async (req: Request, res: Response) => {
+  const settings = db.getSettings();
+  if (settings.authMethods?.emailPasswordEnabled === false) {
+    return res.status(403).json({
+      error: 'إنشاء الحساب عبر البريد وكلمة المرور معطّل حالياً. يرجى المتابعة وتسجيل الدخول بحساب جوجل مباشرة.',
+      code: 'EMAIL_AUTH_DISABLED',
+    });
+  }
+
   const { email, password, name, username, phone, profileData, messagesData, itemsData } = req.body;
 
   if (!email || !password || !name) {
@@ -189,6 +197,14 @@ authRouter.post('/auth/login', handleLogin);
 
 // POST /api/auth/google or /api/google
 const handleGoogleAuth = async (req: Request, res: Response) => {
+  const settings = db.getSettings();
+  if (settings.authMethods?.googleAuthEnabled === false) {
+    return res.status(403).json({
+      error: 'تسجيل الدخول بحساب جوجل معطّل حالياً في إعدادات النظام',
+      code: 'GOOGLE_AUTH_DISABLED',
+    });
+  }
+
   const { googleEmail, name, googleId, picture } = req.body;
 
   if (!googleEmail) {

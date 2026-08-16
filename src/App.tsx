@@ -32,6 +32,12 @@ export interface SystemPublicSettings {
   maritalSupportAllowed: boolean;
   privateCandidMode: string;
   maritalSupportMode: string;
+  authMethods?: {
+    googleAuthEnabled: boolean;
+    emailPasswordEnabled: boolean;
+  };
+  googleClientId?: string;
+  resendConfigured?: boolean;
   updatedAt: string;
   plans: any[];
   paymentMethods: any[];
@@ -831,6 +837,8 @@ export default function App() {
       {isAuthOpen && (
         <AuthModal
           profile={profile}
+          authMethods={systemSettings?.authMethods}
+          serverGoogleClientId={systemSettings?.googleClientId}
           onClose={() => setIsAuthOpen(false)}
           onLoginSuccess={(userData) => {
             if (userData.accountId || userData.id) {

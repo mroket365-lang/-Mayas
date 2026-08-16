@@ -123,6 +123,10 @@ async function startServer() {
       maritalSupportMode: settings.maritalSupportVisibility?.mode || 'hidden',
       features: db.getFeatures(),
       evaluatedFeatures,
+      authMethods: {
+        googleAuthEnabled: settings.authMethods?.googleAuthEnabled !== false,
+        emailPasswordEnabled: Boolean(settings.authMethods?.emailPasswordEnabled),
+      },
       updatedAt: (settings as any).updatedAt || new Date().toISOString(),
       plans: db.getPlans().filter((p) => p.active),
       paymentMethods: (settings.paymentMethods || []).filter((p) => p.enabled),
