@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ShieldAlert, AlertTriangle } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, Minimize2 } from 'lucide-react';
 import { UserProfile, CompanionItem, ChatMessage } from './types';
 import { storageService } from './services/storageService';
 import { alarmEngine } from './services/alarmEngine';
@@ -66,6 +66,7 @@ export default function App() {
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [dailyReviewText, setDailyReviewText] = useState<string>('');
   const [isReviewing, setIsReviewing] = useState(false);
+  const [isFocusMode, setIsFocusMode] = useState(false);
 
   const handleLogout = () => {
     const { profile: guestProfile, items: emptyItems, messages: emptyMessages } = storageService.resetToGuestSession();

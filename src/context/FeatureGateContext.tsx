@@ -24,6 +24,67 @@ interface FeatureGateContextType {
 
 const FeatureGateContext = createContext<FeatureGateContextType | null>(null);
 
+export const FEATURE_ALIASES: Record<string, string> = {
+  // Voice input
+  chat_voice: 'tool_voice_input',
+  voice_input: 'tool_voice_input',
+  tool_voice_input: 'tool_voice_input',
+
+  // Attachments
+  chat_attachment: 'tool_attachments',
+  attachments: 'tool_attachments',
+  tool_attachments: 'tool_attachments',
+
+  // Voice reply / TTS
+  tool_voice_reply: 'tool_voice_reply',
+  voice_reply: 'tool_voice_reply',
+  chat_tts: 'tool_voice_reply',
+
+  // Stats
+  action_stats: 'tool_stats',
+  stats: 'tool_stats',
+  tool_stats: 'tool_stats',
+
+  // Theme
+  pref_dark_mode: 'feature_theme_customization',
+  theme_customization: 'feature_theme_customization',
+  feature_theme_customization: 'feature_theme_customization',
+
+  // Daily review
+  action_daily_review: 'tool_daily_review',
+  daily_review: 'tool_daily_review',
+  tool_daily_review: 'tool_daily_review',
+
+  // Snippets
+  snippet_extractor: 'feature_snippet_extractor',
+  feature_snippet_extractor: 'feature_snippet_extractor',
+
+  // Goals
+  goals_tracking: 'feature_goals_tracking',
+  feature_goals_tracking: 'feature_goals_tracking',
+
+  // Candid & Marital
+  private_candid: 'tool_private_candid',
+  tool_private_candid: 'tool_private_candid',
+  marital_counseling: 'tool_marital_counseling',
+  tool_marital_counseling: 'tool_marital_counseling',
+
+  // Tools menu & Language
+  action_tools_menu: 'action_tools_menu',
+  tools_menu: 'action_tools_menu',
+  pref_language: 'pref_language',
+  language_selector: 'pref_language',
+
+  // Focus mode
+  focus_mode: 'feature_focus_mode',
+  feature_focus_mode: 'feature_focus_mode',
+};
+
+export const normalizeFeatureId = (id: string): string => {
+  if (!id) return id;
+  return FEATURE_ALIASES[id] || id;
+};
+
 interface FeatureGateProviderProps {
   children: ReactNode;
   profile: UserProfile;
@@ -242,6 +303,16 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
       };
     }
 
+    // Map all alias keys to their resolved canonical evaluations
+    Object.entries(FEATURE_ALIASES).forEach(([aliasKey, canonicalId]) => {
+      if (result[canonicalId] && !result[aliasKey]) {
+        result[aliasKey] = {
+          ...result[canonicalId],
+          id: aliasKey,
+        };
+      }
+    });
+
     return result;
   }, [features, profile, currentPlanId, messagesCount, completedTasksCount]);
 
@@ -300,28 +371,33 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
   }, [profile.id, profile.email, currentPlanId, messagesCount, completedTasksCount]);
 
   const isFeatureEnabled = (featureId: string): boolean => {
-    const status = evaluatedFeatures[featureId];
+    const canonical = normalizeFeatureId(featureId);
+    const status = evaluatedFeatures[canonical] || evaluatedFeatures[featureId];
     if (!status) return true; // default open if not configured
     return status.enabled;
   };
 
   const isFeatureVisible = (featureId: string): boolean => {
-    const status = evaluatedFeatures[featureId];
+    const canonical = normalizeFeatureId(featureId);
+    const status = evaluatedFeatures[canonical] || evaluatedFeatures[featureId];
     if (!status) return true;
     if (status.enabled) return true;
     return status.lockedBehavior === 'badge_lock';
   };
 
   const getFeatureStatus = (featureId: string): EvaluatedFeatureStatus | undefined => {
-    return evaluatedFeatures[featureId];
+    const canonical = normalizeFeatureId(featureId);
+    return evaluatedFeatures[canonical] || evaluatedFeatures[featureId];
   };
 
   const getFeatureConfig = (featureId: string): FeatureRuleConfig | undefined => {
-    return features.find((f) => f.id === featureId);
+    const canonical = normalizeFeatureId(featureId);
+    return features.find((f) => f.id === canonical || f.id === featureId);
   };
 
   const triggerLockedPrompt = (featureId: string) => {
-    setActiveLockedFeatureId(featureId);
+    const canonical = normalizeFeatureId(featureId);
+    setActiveLockedFeatureId(canonical || featureId);
   };
 
   const lockedFeatureStatus = activeLockedFeatureId ? evaluatedFeatures[activeLockedFeatureId] : null;

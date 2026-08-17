@@ -27,6 +27,7 @@ import {
   toggleHabitCompletion,
   getLocalDateStr,
 } from '../utils/habitUtils';
+import { useFeatureGate } from '../context/FeatureGateContext';
 
 interface TodayViewProps {
   items: CompanionItem[];
@@ -57,6 +58,7 @@ export const TodayView: React.FC<TodayViewProps> = ({
   reviewText,
   isReviewing,
 }) => {
+  const { isFeatureVisible, isFeatureEnabled, triggerLockedPrompt } = useFeatureGate();
   const [editingItem, setEditingItem] = useState<CompanionItem | null>(null);
   const [isAddHabitModalOpen, setIsAddHabitModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
@@ -185,14 +187,27 @@ export const TodayView: React.FC<TodayViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setIsStatsModalOpen(true)}
-              className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/30 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all"
-              title={isArabic ? 'فتح الإحصائيات' : 'Open Stats'}
-            >
-              <BarChart3 className="w-4 h-4 text-amber-300" />
-              <span className="hidden sm:inline">{isArabic ? 'الإحصائيات' : 'Stats'}</span>
-            </button>
+            {isFeatureVisible('tool_stats') && (
+              <button
+                onClick={() => {
+                  if (!isFeatureEnabled('tool_stats')) {
+                    triggerLockedPrompt('tool_stats');
+                    return;
+                  }
+                  setIsStatsModalOpen(true);
+                }}
+                className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/30 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all relative"
+                title={isArabic ? 'فتح الإحصائيات' : 'Open Stats'}
+              >
+                <BarChart3 className="w-4 h-4 text-amber-300" />
+                <span className="hidden sm:inline">{isArabic ? 'الإحصائيات' : 'Stats'}</span>
+                {!isFeatureEnabled('tool_stats') && (
+                  <span className="p-0.5 rounded-full bg-amber-400 text-stone-900">
+                    <CheckCircle2 className="w-2.5 h-2.5" />
+                  </span>
+                )}
+              </button>
+            )}
 
             <div className="px-3 py-1.5 rounded-xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center gap-1.5">
               <Trophy className="w-4 h-4 text-amber-300 shrink-0" />
@@ -453,35 +468,50 @@ export const TodayView: React.FC<TodayViewProps> = ({
       </div>
 
       {/* SECTION 3: END-OF-DAY REVIEW WITH AI COMPANION */}
-      <div className="p-4 sm:p-5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-sm space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-amber-500" />
-            <h3 className="text-sm sm:text-base font-bold text-[var(--text-main)]">{t.reviewHeader}</h3>
+      {isFeatureVisible('tool_daily_review') && (
+        <div className="p-4 sm:p-5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              <h3 className="text-sm sm:text-base font-bold text-[var(--text-main)] flex items-center gap-2">
+                <span>{t.reviewHeader}</span>
+                {!isFeatureEnabled('tool_daily_review') && (
+                  <span className="p-0.5 rounded-full bg-amber-400 text-stone-900">
+                    <CheckCircle2 className="w-2.5 h-2.5" />
+                  </span>
+                )}
+              </h3>
+            </div>
+
+            <button
+              onClick={() => {
+                if (!isFeatureEnabled('tool_daily_review')) {
+                  triggerLockedPrompt('tool_daily_review');
+                  return;
+                }
+                onStartEndReview();
+              }}
+              disabled={isReviewing}
+              className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-sage)] text-white text-xs font-bold hover:opacity-90 transition-all flex items-center gap-1.5 shadow-sm"
+            >
+              <PlayCircle className="w-3.5 h-3.5" />
+              <span>{t.startReview}</span>
+            </button>
           </div>
 
-          <button
-            onClick={onStartEndReview}
-            disabled={isReviewing}
-            className="px-3.5 py-1.5 rounded-xl bg-[var(--accent-sage)] text-white text-xs font-bold hover:opacity-90 transition-all flex items-center gap-1.5 shadow-sm"
-          >
-            <PlayCircle className="w-3.5 h-3.5" />
-            <span>{t.startReview}</span>
-          </button>
+          {reviewText ? (
+            <div className="p-3.5 rounded-xl bg-[var(--bg-hover)] text-xs sm:text-sm text-[var(--text-main)] leading-relaxed border border-[var(--border-color)] italic">
+              "{reviewText}"
+            </div>
+          ) : (
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+              {isArabic
+                ? 'عند نهاية اليوم، اضغط على مراجعة اليوم ليتحدث معك رفيقك عن إنجازاتك اليومية ويعينك على مراجعة ما تبقى بهدوء.'
+                : 'At the end of your day, review your completed achievements with your companion.'}
+            </p>
+          )}
         </div>
-
-        {reviewText ? (
-          <div className="p-3.5 rounded-xl bg-[var(--bg-hover)] text-xs sm:text-sm text-[var(--text-main)] leading-relaxed border border-[var(--border-color)] italic">
-            "{reviewText}"
-          </div>
-        ) : (
-          <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-            {isArabic
-              ? 'عند نهاية اليوم، اضغط على مراجعة اليوم ليتحدث معك رفيقك عن إنجازاتك اليومية ويعينك على مراجعة ما تبقى بهدوء.'
-              : 'At the end of your day, review your completed achievements with your companion.'}
-          </p>
-        )}
-      </div>
+      )}
 
       {/* MODAL 1: EDIT ITEM MODAL */}
       {editingItem && (

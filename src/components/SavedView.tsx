@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { CompanionItem, ItemType, UserProfile } from '../types';
 import { getTranslation } from '../locales/translations';
-import { Search, Plus, Trash2, CheckCircle2, Clock, Calendar, Bell, BookmarkCheck, Lightbulb, Repeat, AlertCircle, Edit3, Flame, Target, Feather } from 'lucide-react';
+import { Search, Plus, Trash2, CheckCircle2, Clock, Calendar, Bell, BookmarkCheck, Lightbulb, Repeat, AlertCircle, Edit3, Flame, Target, Feather, Lock } from 'lucide-react';
 import { EditItemModal } from './EditItemModal';
 import { TaskItemCard } from './TaskItemCard';
 import { LongNoteModal } from './LongNoteModal';
 import { GoalPlanModal } from './GoalPlanModal';
+import { useFeatureGate } from '../context/FeatureGateContext';
 
 interface SavedViewProps {
   items: CompanionItem[];
@@ -22,6 +23,7 @@ export const SavedView: React.FC<SavedViewProps> = ({
   onDeleteItem,
   onAddItem,
 }) => {
+  const { isFeatureVisible, isFeatureEnabled, triggerLockedPrompt } = useFeatureGate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<ItemType | 'all'>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -100,23 +102,45 @@ export const SavedView: React.FC<SavedViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-          <button
-            onClick={() => setIsLongNoteModalOpen(true)}
-            className="px-3 py-1.5 rounded-xl bg-teal-600/15 hover:bg-teal-600/25 text-teal-700 dark:text-teal-300 border border-teal-500/30 font-bold text-xs flex items-center gap-1 transition-all"
-            title={isArabic ? 'تدوين ملاحظة طويلة، قصيدة أو مقتطف' : 'New Long Note'}
-          >
-            <Feather className="w-3.5 h-3.5" />
-            <span>{isArabic ? 'ملاحظة / قصيدة' : 'Long Note'}</span>
-          </button>
+          {isFeatureVisible('feature_snippet_extractor') && (
+            <button
+              onClick={() => {
+                if (!isFeatureEnabled('feature_snippet_extractor')) {
+                  triggerLockedPrompt('feature_snippet_extractor');
+                  return;
+                }
+                setIsLongNoteModalOpen(true);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-teal-600/15 hover:bg-teal-600/25 text-teal-700 dark:text-teal-300 border border-teal-500/30 font-bold text-xs flex items-center gap-1 transition-all relative"
+              title={isArabic ? 'تدوين ملاحظة طويلة، قصيدة أو مقتطف' : 'New Long Note'}
+            >
+              <Feather className="w-3.5 h-3.5" />
+              <span>{isArabic ? 'ملاحظة / قصيدة' : 'Long Note'}</span>
+              {!isFeatureEnabled('feature_snippet_extractor') && (
+                <Lock className="w-3 h-3 text-amber-500 ms-0.5" />
+              )}
+            </button>
+          )}
 
-          <button
-            onClick={() => setIsGoalModalOpen(true)}
-            className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-1 transition-all"
-            title={isArabic ? 'إنشاء هدف محدد بوقت وخطة' : 'New Goal Plan'}
-          >
-            <Target className="w-3.5 h-3.5" />
-            <span>{isArabic ? 'خطة / هدف' : 'Goal Plan'}</span>
-          </button>
+          {isFeatureVisible('feature_goals_tracking') && (
+            <button
+              onClick={() => {
+                if (!isFeatureEnabled('feature_goals_tracking')) {
+                  triggerLockedPrompt('feature_goals_tracking');
+                  return;
+                }
+                setIsGoalModalOpen(true);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-1 transition-all relative"
+              title={isArabic ? 'إنشاء هدف محدد بوقت وخطة' : 'New Goal Plan'}
+            >
+              <Target className="w-3.5 h-3.5" />
+              <span>{isArabic ? 'خطة / هدف' : 'Goal Plan'}</span>
+              {!isFeatureEnabled('feature_goals_tracking') && (
+                <Lock className="w-3 h-3 text-amber-500 ms-0.5" />
+              )}
+            </button>
+          )}
 
           <button
             onClick={() => setIsAddModalOpen(true)}

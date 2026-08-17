@@ -8,12 +8,22 @@ interface BottomNavProps {
   activeTab: 'companion' | 'saved' | 'today' | 'profile';
   onTabChange: (tab: 'companion' | 'saved' | 'today' | 'profile') => void;
   profile: UserProfile;
+  isFocusMode?: boolean;
 }
 
-export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, profile }) => {
+export const BottomNav: React.FC<BottomNavProps> = ({
+  activeTab,
+  onTabChange,
+  profile,
+  isFocusMode = false,
+}) => {
   const t = getTranslation(profile.language);
   const isArabic = profile.language === 'ar';
   const { isFeatureEnabled, isFeatureVisible, triggerLockedPrompt } = useFeatureGate();
+
+  if (isFocusMode) {
+    return null;
+  }
 
   const navItems = [
     {

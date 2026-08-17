@@ -72,6 +72,8 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(({
   onExtractText,
   onToggleSpeech,
 }) => {
+  const { isFeatureVisible, isFeatureEnabled, triggerLockedPrompt } = useFeatureGate();
+
   const timeString = React.useMemo(() => {
     try {
       return new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -176,19 +178,38 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(({
         </button>
 
         {/* Snippet Extractor Button */}
-        <button
-          onClick={() => onExtractText(msg.text)}
-          className="p-1.5 rounded-xl text-[var(--text-muted)] hover:text-[var(--accent-sage)] hover:bg-[var(--bg-hover)] transition-all"
-          title={profile.language === 'ar' ? 'تحديد ونسخ نص/أجزاء منفصلة' : 'Extract & copy text snippet'}
-        >
-          <Scissors className="w-3.5 h-3.5" />
-        </button>
+        {isFeatureVisible('feature_snippet_extractor') && (
+          <button
+            onClick={() => {
+              if (!isFeatureEnabled('feature_snippet_extractor')) {
+                triggerLockedPrompt('feature_snippet_extractor');
+                return;
+              }
+              onExtractText(msg.text);
+            }}
+            className="p-1.5 rounded-xl text-[var(--text-muted)] hover:text-[var(--accent-sage)] hover:bg-[var(--bg-hover)] transition-all relative"
+            title={profile.language === 'ar' ? 'تحديد ونسخ أجزاء النص / المقتطفات' : 'Extract & copy text snippet'}
+          >
+            <Scissors className="w-3.5 h-3.5" />
+            {!isFeatureEnabled('feature_snippet_extractor') && (
+              <div className="absolute -top-1 -end-1 bg-amber-500 text-white rounded-full p-0.5 shadow-xs">
+                <Lock className="w-2 h-2" />
+              </div>
+            )}
+          </button>
+        )}
 
         {/* Play / Stop Reading TTS Button for AI Messages */}
-        {msg.sender === 'ai' && (
+        {msg.sender === 'ai' && isFeatureVisible('tool_voice_reply') && (
           <button
-            onClick={() => onToggleSpeech(msg.id, msg.text)}
-            className={`p-1.5 rounded-xl transition-all flex items-center gap-1 ${
+            onClick={() => {
+              if (!isFeatureEnabled('tool_voice_reply')) {
+                triggerLockedPrompt('tool_voice_reply');
+                return;
+              }
+              onToggleSpeech(msg.id, msg.text);
+            }}
+            className={`p-1.5 rounded-xl transition-all flex items-center gap-1 relative ${
               speakingMsgId === msg.id
                 ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 animate-pulse font-bold'
                 : 'text-[var(--text-muted)] hover:text-[var(--accent-sage)] hover:bg-[var(--bg-hover)]'
@@ -206,6 +227,11 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(({
               </>
             ) : (
               <Volume2 className="w-3.5 h-3.5" />
+            )}
+            {!isFeatureEnabled('tool_voice_reply') && (
+              <div className="absolute -top-1 -end-1 bg-amber-500 text-white rounded-full p-0.5 shadow-xs">
+                <Lock className="w-2 h-2" />
+              </div>
             )}
           </button>
         )}
@@ -802,60 +828,88 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
           )}
 
           <form onSubmit={handleSend} className="flex items-end gap-1.5 sm:gap-2 relative">
-            {/* When typing (inputText.trim().length > 0), hide paperclip and mic buttons, show single + button */}
+            {/* When typing (inputText.trim().length > 0), hide paperclip and mic buttons, show single + button if any option is visible */}
             {inputText.trim().length > 0 ? (
-              <div className="relative shrink-0 mb-0.5" ref={plusMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
-                  className={`p-2.5 sm:p-3 rounded-2xl border transition-all shrink-0 ${
-                    isPlusMenuOpen
-                      ? 'bg-[var(--accent-sage)] text-white border-[var(--accent-sage)]'
-                      : 'bg-[var(--bg-hover)] text-[var(--accent-sage)] border-[var(--border-color)] hover:bg-[var(--accent-sage)]/10'
-                  }`}
-                  title={profile.language === 'ar' ? 'إضافة خيارات' : 'Add options'}
-                >
-                  <Plus className={`w-5 h-5 transition-transform duration-200 ${isPlusMenuOpen ? 'rotate-45' : ''}`} />
-                </button>
+              (isFeatureVisible('tool_attachments') || isFeatureVisible('tool_voice_input')) && (
+                <div className="relative shrink-0 mb-0.5" ref={plusMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
+                    className={`p-2.5 sm:p-3 rounded-2xl border transition-all shrink-0 ${
+                      isPlusMenuOpen
+                        ? 'bg-[var(--accent-sage)] text-white border-[var(--accent-sage)]'
+                        : 'bg-[var(--bg-hover)] text-[var(--accent-sage)] border-[var(--border-color)] hover:bg-[var(--accent-sage)]/10'
+                    }`}
+                    title={profile.language === 'ar' ? 'إضافة خيارات' : 'Add options'}
+                  >
+                    <Plus className={`w-5 h-5 transition-transform duration-200 ${isPlusMenuOpen ? 'rotate-45' : ''}`} />
+                  </button>
 
-                {/* Popover options menu */}
-                {isPlusMenuOpen && (
-                  <div className="absolute bottom-full mb-2 start-0 z-50 min-w-[15rem] w-64 p-2 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl space-y-1.5 animate-scale-up">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsPlusMenuOpen(false);
-                        fileInputRef.current?.click();
-                      }}
-                      className="w-full px-3 py-2.5 rounded-xl hover:bg-[var(--bg-hover)] text-xs font-bold text-[var(--text-main)] flex items-center gap-2.5 transition-all text-start whitespace-nowrap"
-                    >
-                      <Paperclip className="w-4 h-4 text-[var(--accent-sage)] shrink-0" />
-                      <span className="whitespace-nowrap">{profile.language === 'ar' ? 'رفع صورة أو مستند' : 'Attach Photo or Document'}</span>
-                    </button>
+                  {/* Popover options menu */}
+                  {isPlusMenuOpen && (
+                    <div className="absolute bottom-full mb-2 start-0 z-50 min-w-[15rem] w-64 p-2 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl space-y-1.5 animate-scale-up">
+                      {isFeatureVisible('tool_attachments') && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsPlusMenuOpen(false);
+                            if (!isFeatureEnabled('tool_attachments')) {
+                              triggerLockedPrompt('tool_attachments');
+                              return;
+                            }
+                            fileInputRef.current?.click();
+                          }}
+                          className="w-full px-3 py-2.5 rounded-xl hover:bg-[var(--bg-hover)] text-xs font-bold text-[var(--text-main)] flex items-center justify-between transition-all text-start"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <Paperclip className="w-4 h-4 text-[var(--accent-sage)] shrink-0" />
+                            <span className="whitespace-nowrap">{profile.language === 'ar' ? 'رفع صورة أو مستند' : 'Attach Photo or Document'}</span>
+                          </div>
+                          {!isFeatureEnabled('tool_attachments') && (
+                            <span className="p-1 rounded-lg bg-amber-500/15 text-amber-600">
+                              <Lock className="w-3 h-3" />
+                            </span>
+                          )}
+                        </button>
+                      )}
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsPlusMenuOpen(false);
-                        startVoiceInteraction();
-                      }}
-                      className="w-full px-3 py-2.5 rounded-xl hover:bg-[var(--bg-hover)] text-xs font-bold text-[var(--text-main)] flex items-center gap-2.5 transition-all text-start whitespace-nowrap"
-                    >
-                      <Mic className="w-4 h-4 text-emerald-500 shrink-0" />
-                      <span className="whitespace-nowrap">{profile.language === 'ar' ? 'المحادثة الصوتية المباشرة' : 'Live Voice Conversation'}</span>
-                    </button>
-                  </div>
-                )}
-              </div>
+                      {isFeatureVisible('tool_voice_input') && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsPlusMenuOpen(false);
+                            if (!isFeatureEnabled('tool_voice_input')) {
+                              triggerLockedPrompt('tool_voice_input');
+                              return;
+                            }
+                            startVoiceInteraction();
+                          }}
+                          className="w-full px-3 py-2.5 rounded-xl hover:bg-[var(--bg-hover)] text-xs font-bold text-[var(--text-main)] flex items-center justify-between transition-all text-start"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <Mic className="w-4 h-4 text-emerald-500 shrink-0" />
+                            <span className="whitespace-nowrap">{profile.language === 'ar' ? 'المحادثة الصوتية المباشرة' : 'Live Voice Conversation'}</span>
+                          </div>
+                          {!isFeatureEnabled('tool_voice_input') && (
+                            <span className="p-1 rounded-lg bg-amber-500/15 text-amber-600">
+                              <Lock className="w-3 h-3" />
+                            </span>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
             ) : (
               /* When NOT typing (inputText is empty), show Paperclip & Mic buttons if allowed */
               <>
-                {isFeatureVisible('chat_attachment') && (
+                {isFeatureVisible('tool_attachments') && (
                   <button
                     type="button"
                     onClick={() => {
-                      if (!isFeatureEnabled('chat_attachment')) {
-                        triggerLockedPrompt('chat_attachment');
+                      if (!isFeatureEnabled('tool_attachments')) {
+                        triggerLockedPrompt('tool_attachments');
                         return;
                       }
                       fileInputRef.current?.click();
@@ -864,7 +918,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
                     title={t.attachMedia}
                   >
                     <Paperclip className="w-5 h-5" />
-                    {!isFeatureEnabled('chat_attachment') && (
+                    {!isFeatureEnabled('tool_attachments') && (
                       <div className="absolute -top-1 -end-1 bg-amber-500 text-white rounded-full p-0.5 shadow-sm">
                         <Lock className="w-2.5 h-2.5" />
                       </div>
@@ -872,12 +926,12 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
                   </button>
                 )}
 
-                {isFeatureVisible('chat_voice') && (
+                {isFeatureVisible('tool_voice_input') && (
                   <button
                     type="button"
                     onClick={() => {
-                      if (!isFeatureEnabled('chat_voice')) {
-                        triggerLockedPrompt('chat_voice');
+                      if (!isFeatureEnabled('tool_voice_input')) {
+                        triggerLockedPrompt('tool_voice_input');
                         return;
                       }
                       startVoiceInteraction();
@@ -886,7 +940,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
                     title={t.voiceMode}
                   >
                     <Mic className="w-5 h-5" />
-                    {!isFeatureEnabled('chat_voice') && (
+                    {!isFeatureEnabled('tool_voice_input') && (
                       <div className="absolute -top-1 -end-1 bg-amber-500 text-white rounded-full p-0.5 shadow-sm">
                         <Lock className="w-2.5 h-2.5" />
                       </div>
