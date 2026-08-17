@@ -23,7 +23,10 @@ import {
   UserCheck,
   LogIn,
   Crown,
+  Sparkles,
+  Lock,
 } from 'lucide-react';
+import { useFeatureGate } from '../context/FeatureGateContext';
 
 import { SystemPublicSettings } from '../App';
 
@@ -34,6 +37,7 @@ interface SettingsModalProps {
   onClearMemory: () => void;
   onExportData: () => void;
   onOpenMaritalSupport?: () => void;
+  onOpenConsultationsHub?: () => void;
   onOpenSubscription?: () => void;
   onOpenAuth?: () => void;
   systemSettings?: SystemPublicSettings | null;
@@ -46,12 +50,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClearMemory,
   onExportData,
   onOpenMaritalSupport,
+  onOpenConsultationsHub,
   onOpenSubscription,
   onOpenAuth,
   systemSettings,
 }) => {
   const [localProfile, setLocalProfile] = useState<UserProfile>({ ...profile });
   const t = getTranslation(localProfile.language);
+  const { isFeatureVisible, isFeatureEnabled, triggerLockedPrompt } = useFeatureGate();
 
   // Permission status tracking
   const [micStatus, setMicStatus] = useState<'prompt' | 'granted' | 'denied'>('prompt');
@@ -393,7 +399,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <label className="relative inline-flex items-center cursor-pointer shrink-0">
                   <input
                     type="checkbox"
-                    checked={localProfile.privateCandidMode || localProfile.personality === 'bold'}
+                    checked={Boolean(localProfile.privateCandidMode)}
                     onChange={(e) =>
                       setLocalProfile({ ...localProfile, privateCandidMode: e.target.checked })
                     }
@@ -405,47 +411,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* 4.6 Marital Intimacy & Special Needs Counseling Card */}
-          {systemSettings?.maritalSupportAllowed !== false && onOpenMaritalSupport && (
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-500/10 via-pink-500/10 to-amber-500/10 border border-rose-500/30 space-y-3">
+          {/* 4.6 Specialized Consultations Hub Card */}
+          {onOpenConsultationsHub && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-teal-500/10 border border-indigo-500/30 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-rose-500/20 text-rose-500 shrink-0">
-                    <HeartHandshake className="w-5 h-5 text-rose-500 animate-pulse" />
+                  <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-600 shrink-0">
+                    <Sparkles className="w-5 h-5 text-indigo-500 animate-pulse" />
                   </div>
                   <div>
                     <h4 className="text-sm font-extrabold text-[var(--text-main)] flex items-center gap-2">
                       <span>
                         {localProfile.language === 'ar'
-                          ? 'جلسة الدعم والاستشارة الزوجية (18+)'
-                          : 'Marital Support Session (18+)'}
+                          ? 'مركز الاستشارات المتخصصة'
+                          : 'Specialized Consultations Hub'}
                       </span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-600 font-bold border border-rose-500/30">
-                        {localProfile.language === 'ar' ? '60 دقيقة يومياً' : '60 Mins'}
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-600 font-bold border border-indigo-500/30">
+                        {localProfile.language === 'ar' ? 'اقتصادي، أسري، ديني، سياسي، نفسي، زوجي' : '6 Expert Domains'}
                       </span>
                     </h4>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">
                       {localProfile.language === 'ar'
-                        ? 'مخصصة للتغلب على صعوبات العلاقة الزوجية الحميمة والتواصل مع الزوج/الزوجة عبر التعهد والسن القانوني (18+).'
-                        : 'Specialized counseling to overcome marital intimacy challenges with age verification (18+).'}
+                        ? 'تخصيص استشارات موجهة وشاملة وفق أحدث المعايير العلمية والنفسية والأسرية والمالية.'
+                        : 'Access curated expert consulting sessions tailored to your goals and life decisions.'}
                     </p>
                   </div>
                 </div>
 
                 <button
                   type="button"
-                  onClick={onOpenMaritalSupport}
-                  className="px-3 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 text-white text-xs font-bold shadow-md hover:opacity-90 shrink-0 transition-all"
+                  onClick={() => {
+                    onClose();
+                    onOpenConsultationsHub();
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-600 text-white text-xs font-bold shadow-md hover:opacity-90 shrink-0 transition-all"
                 >
-                  {localProfile.specialCounselingEnabled &&
-                  localProfile.specialCounselingExpiresAt &&
-                  new Date(localProfile.specialCounselingExpiresAt).getTime() > Date.now()
-                    ? localProfile.language === 'ar'
-                      ? 'مفعّلة الآن'
-                      : 'Active Now'
-                    : localProfile.language === 'ar'
-                    ? 'تفعيل الجلسة'
-                    : 'Activate'}
+                  {localProfile.language === 'ar' ? 'فتح البوابة' : 'Open Hub'}
                 </button>
               </div>
             </div>
@@ -525,13 +526,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <span>{t.clearMemory}</span>
             </button>
 
-            <a
-              href="/admin"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-xs font-bold text-indigo-400 transition-all ml-auto"
-            >
-              <ShieldAlert className="w-4 h-4 text-indigo-400" />
-              <span>{localProfile.language === 'ar' ? 'لوحة التحكم الإدارية (Admin)' : 'Admin Panel'}</span>
-            </a>
+            {isFeatureVisible('button_admin_panel') && (
+              <a
+                href="/admin"
+                onClick={(e) => {
+                  if (!isFeatureEnabled('button_admin_panel')) {
+                    e.preventDefault();
+                    triggerLockedPrompt('button_admin_panel');
+                  }
+                }}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-xs font-bold text-indigo-400 transition-all ml-auto ${
+                  !isFeatureEnabled('button_admin_panel') ? 'opacity-75' : ''
+                }`}
+              >
+                <ShieldAlert className="w-4 h-4 text-indigo-400" />
+                <span>{localProfile.language === 'ar' ? 'لوحة التحكم الإدارية (Admin)' : 'Admin Panel'}</span>
+                {!isFeatureEnabled('button_admin_panel') && (
+                  <Lock className="w-3 h-3 text-amber-400 ms-1" />
+                )}
+              </a>
+            )}
           </div>
         </div>
 

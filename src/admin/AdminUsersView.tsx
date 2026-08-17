@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Shield, UserX, UserCheck, RefreshCw, Crown, MoreHorizontal, Calendar, Mail, CheckCircle2, X } from 'lucide-react';
+import { Search, Filter, Shield, UserX, UserCheck, RefreshCw, Crown, MoreHorizontal, Calendar, Mail, CheckCircle2, X, MapPin, Globe } from 'lucide-react';
 
 interface UserItem {
   id: string;
@@ -7,8 +7,13 @@ interface UserItem {
   email: string;
   role: string;
   status: 'active' | 'suspended' | 'banned';
+  isGuest?: boolean;
   createdAt: string;
   lastActiveAt: string;
+  country?: string;
+  countryCode?: string;
+  city?: string;
+  locationStatus?: 'granted' | 'denied' | 'prompt' | 'unknown';
   subscription: {
     id?: string;
     planId: string;
@@ -29,6 +34,9 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ token }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [planFilter, setPlanFilter] = useState('');
+  const [userTypeTab, setUserTypeTab] = useState<'registered' | 'guest' | 'all'>('registered');
+  const [registeredCount, setRegisteredCount] = useState(0);
+  const [guestCount, setGuestCount] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -51,6 +59,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ token }) => {
         search,
         status: statusFilter,
         plan: planFilter,
+        userType: userTypeTab,
         page: page.toString(),
         limit: '10',
       });
@@ -63,6 +72,8 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ token }) => {
         const data = await res.json();
         setUsers(data.users);
         setTotalPages(data.totalPages);
+        if (data.registeredCount !== undefined) setRegisteredCount(data.registeredCount);
+        if (data.guestCount !== undefined) setGuestCount(data.guestCount);
       }
     } catch (err) {
       console.error('Fetch users error:', err);
@@ -73,7 +84,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ token }) => {
 
   useEffect(() => {
     fetchUsers();
-  }, [search, statusFilter, planFilter, page]);
+  }, [search, statusFilter, planFilter, userTypeTab, page]);
 
   const openUserDetails = async (user: UserItem) => {
     setSelectedUser(user);
@@ -140,6 +151,60 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ token }) => {
 
   return (
     <div className="space-y-6">
+      {/* User Category Tabs (Registered Accounts vs Non-logged Guests) */}
+      <div className="flex items-center gap-2 p-1.5 bg-slate-900 border border-slate-800 rounded-2xl">
+        <button
+          onClick={() => {
+            setUserTypeTab('registered');
+            setPage(1);
+          }}
+          className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            userTypeTab === 'registered'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+          }`}
+        >
+          <span>المستخدمون المسجلون (حسابات موثقة)</span>
+          <span className="px-2 py-0.5 rounded-full bg-slate-950/60 text-[10px] font-mono">
+            {registeredCount}
+          </span>
+        </button>
+
+        <button
+          onClick={() => {
+            setUserTypeTab('guest');
+            setPage(1);
+          }}
+          className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            userTypeTab === 'guest'
+              ? 'bg-amber-600 text-white shadow-md'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+          }`}
+        >
+          <span>الزوار وغير المسجلين</span>
+          <span className="px-2 py-0.5 rounded-full bg-slate-950/60 text-[10px] font-mono">
+            {guestCount}
+          </span>
+        </button>
+
+        <button
+          onClick={() => {
+            setUserTypeTab('all');
+            setPage(1);
+          }}
+          className={`py-2 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            userTypeTab === 'all'
+              ? 'bg-slate-800 text-white shadow-md'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+          }`}
+        >
+          <span>الكل</span>
+          <span className="px-2 py-0.5 rounded-full bg-slate-950/60 text-[10px] font-mono">
+            {registeredCount + guestCount}
+          </span>
+        </button>
+      </div>
+
       {/* Header & Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900 p-4 border border-slate-800 rounded-2xl">
         <div className="flex items-center gap-3">
@@ -210,6 +275,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ token }) => {
               <tr>
                 <th className="px-4 py-3">المستخدم</th>
                 <th className="px-4 py-3">الخطة الحالية</th>
+                <th className="px-4 py-3">الموقع / البلد</th>
                 <th className="px-4 py-3">الحالة</th>
                 <th className="px-4 py-3">تاريخ التسجيل</th>
                 <th className="px-4 py-3">آخر نشاط</th>
@@ -219,13 +285,13 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ token }) => {
             <tbody className="divide-y divide-slate-800">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-8 text-slate-500">
+                  <td colSpan={7} className="text-center py-8 text-slate-500">
                     جاري تحميل المستخدمين...
                   </td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-8 text-slate-500">
+                  <td colSpan={7} className="text-center py-8 text-slate-500">
                     لا يوجد مستخدمون مطابقون للبحث
                   </td>
                 </tr>
@@ -233,8 +299,15 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ token }) => {
                 users.map((u) => (
                   <tr key={u.id} className="hover:bg-slate-800/50 transition-colors">
                     <td className="px-4 py-3 font-medium text-white">
-                      <div>{u.name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">{u.email}</div>
+                      <div className="flex items-center gap-2">
+                        <span>{u.name}</span>
+                        {u.isGuest && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                            زائر غير مسجل
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono">{u.email || 'حساب غير مسجل بريد'}</div>
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -247,6 +320,27 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ token }) => {
                         {u.subscription.planId === 'premium' && <Crown className="w-3 h-3 text-amber-400" />}
                         {u.subscription.planName}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1 font-medium text-slate-200">
+                          <MapPin className="w-3 h-3 text-indigo-400 shrink-0" />
+                          <span>{u.country || u.city ? `${u.country || ''} ${u.city ? `(${u.city})` : ''}` : 'غير معروف'}</span>
+                        </div>
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded w-fit ${
+                          u.locationStatus === 'granted'
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            : u.locationStatus === 'denied'
+                            ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}>
+                          {u.locationStatus === 'granted'
+                            ? 'تم السماح بالموقع'
+                            : u.locationStatus === 'denied'
+                            ? 'تم رفض الوصول للموقع'
+                            : 'غير معروف'}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <span

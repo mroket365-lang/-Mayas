@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CompanionItem, GoalMilestone, UserProfile } from '../types';
+import { CompanionItem, GoalMilestone, TaskCategory, UserProfile } from '../types';
 import { getTranslation } from '../locales/translations';
 import {
   Target,
@@ -17,7 +17,9 @@ import {
   Brain,
   AlertCircle,
   Loader2,
+  Tag,
 } from 'lucide-react';
+import { TASK_CATEGORIES, getTaskCategoryConfig } from '../constants/taskCategories';
 
 interface GoalPlanModalProps {
   isOpen: boolean;
@@ -43,6 +45,7 @@ export const GoalPlanModal: React.FC<GoalPlanModalProps> = ({
   const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split('T')[0];
 
   const [title, setTitle] = useState(initialItem?.title || '');
+  const [category, setCategory] = useState<TaskCategory>(initialItem?.category || 'personal');
   const [targetGoal, setTargetGoal] = useState(initialItem?.targetGoal || initialItem?.description || '');
   const [startDate, setStartDate] = useState(initialItem?.startDate || todayStr);
   const [endDate, setEndDate] = useState(initialItem?.endDate || initialItem?.dueDate || thirtyDaysLater);
@@ -143,6 +146,7 @@ export const GoalPlanModal: React.FC<GoalPlanModalProps> = ({
       userId: initialItem?.userId || profile.id || 'user_local',
       type: 'goal',
       title: title.trim(),
+      category: category || undefined,
       description: targetGoal.trim(),
       status: calculatedProgress >= 100 ? 'completed' : 'pending',
       createdAt: initialItem?.createdAt || new Date().toISOString(),
@@ -205,6 +209,34 @@ export const GoalPlanModal: React.FC<GoalPlanModalProps> = ({
               className="w-full px-4 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] text-sm font-bold focus:outline-none focus:ring-1 focus:ring-[var(--accent-sage)]"
               required
             />
+          </div>
+
+          {/* Category Chips */}
+          <div>
+            <label className="text-xs font-bold text-[var(--text-muted)] mb-1.5 flex items-center gap-1">
+              <Tag className="w-3.5 h-3.5 text-[var(--accent-sage)]" />
+              <span>{isArabic ? 'مجال / تصنيف الهدف:' : 'Goal Category:'}</span>
+            </label>
+            <div className="flex flex-wrap gap-1.5 p-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)]">
+              {TASK_CATEGORIES.map((cat) => {
+                const isSelected = category === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setCategory(cat.id)}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-bold border flex items-center gap-1 transition-all ${
+                      isSelected
+                        ? cat.activeChipClass
+                        : `${cat.bgClass} ${cat.textClass} ${cat.borderClass} hover:opacity-80`
+                    }`}
+                  >
+                    <span>{cat.icon}</span>
+                    <span>{isArabic ? cat.nameAr : cat.nameEn}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Target Goal Motivation / Details */}

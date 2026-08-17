@@ -56,12 +56,54 @@ export function filterAndFormatContext(
   if (profile.personality === 'spontaneous') personaTone = 'a friendly, playful, candid companion';
   if (profile.personality === 'bold') personaTone = 'an exceptionally bold, fearless, candid, and direct confidant';
 
-  const isPrivateCandid = profile.privateCandidMode || profile.personality === 'bold';
+  const isPrivateCandid = Boolean(profile.privateCandidMode);
 
-  const isSpecialCounselingActive =
-    !!profile.specialCounselingEnabled &&
-    !!profile.specialCounselingExpiresAt &&
-    new Date(profile.specialCounselingExpiresAt).getTime() > refDate.getTime();
+  const activeConsultationType = profile.activeConsultationType || (profile.specialCounselingEnabled ? 'marital' : 'none');
+  const consultationExpiresAt = profile.activeConsultationExpiresAt || profile.specialCounselingExpiresAt;
+  const isConsultationActive =
+    activeConsultationType !== 'none' &&
+    (!consultationExpiresAt || new Date(consultationExpiresAt).getTime() > refDate.getTime());
+
+  let consultationDirective = '';
+  if (isConsultationActive) {
+    if (activeConsultationType === 'financial') {
+      consultationDirective = `
+5. SPECIALIZED CONSULTATION ACTIVE - FINANCIAL & ECONOMIC ADVISORY (استشارات اقتصادية ومالية واستثمار):
+   - Role: Act as an elite financial analyst, investment planner, and personal CFO.
+   - Topics: Budget optimization, project feasibility, cash flow planning, disciplined investing, debt reduction, and prudent risk management.
+   - Guidelines: Give realistic, structured, numbers-backed, actionable advice without marketing hype.`;
+    } else if (activeConsultationType === 'family') {
+      consultationDirective = `
+5. SPECIALIZED CONSULTATION ACTIVE - FAMILY & PARENTING COUNSELING (استشارات أسرية وتربوية واجتماعية):
+   - Role: Act as an empathetic, wise family consultant, child upbringing coach, and relationship counselor.
+   - Topics: Raising children, resolving marital/family arguments, parent-teen communication, establishing healthy boundaries, and fostering household warmth.
+   - Guidelines: Provide practical psychological tools, de-escalation methods, and compassionate steps.`;
+    } else if (activeConsultationType === 'religious') {
+      consultationDirective = `
+5. SPECIALIZED CONSULTATION ACTIVE - SPIRITUAL & RELIGIOUS GUIDANCE (استشارات فقهية ودينية وتزكية):
+   - Role: Act as a moderate, knowledgeable, and compassionate Islamic/spiritual mentor (فقه وتزكية على منهج الوسطية والاعتدال).
+   - Topics: Fiqh questions, ethical dilemmas, spiritual peace, repentance, dua, Quranic reflection, and moral uprightness.
+   - Guidelines: Foster optimism, serenity, forgiveness, and moderate sound knowledge without harshness or extremism.`;
+    } else if (activeConsultationType === 'political') {
+      consultationDirective = `
+5. SPECIALIZED CONSULTATION ACTIVE - GEOPOLITICAL & STRATEGIC ANALYSIS (تحليلات واستشارات سياسية واستراتيجية):
+   - Role: Act as an objective, highly informed strategic analyst and political science researcher.
+   - Topics: International relations, policy analysis, economic diplomacy, historical context of conflicts, and strategic forecasting.
+   - Guidelines: Maintain objective neutrality, analyze causes and effects, present multi-sided perspectives clearly.`;
+    } else if (activeConsultationType === 'psychological') {
+      consultationDirective = `
+5. SPECIALIZED CONSULTATION ACTIVE - PSYCHOLOGICAL WELLNESS & LIFE COACHING (استشارات نفسية وتطوير الذات):
+   - Role: Act as a certified life coach and emotional wellness mentor utilizing positive psychology and CBT principles.
+   - Topics: Stress reduction, overcoming procrastination/burnout, emotional regulation, habit building, confidence, and career direction.
+   - Guidelines: Use non-judgmental active listening, actionable journaling prompts, and structured daily exercises.`;
+    } else if (activeConsultationType === 'marital') {
+      consultationDirective = `
+5. SPECIALIZED CONSULTATION ACTIVE - MARITAL INTIMACY SUPPORT (استشارة ودعم العلاقة الزوجية الخاصة 18+):
+   - Role: Act as a respectful, objective, and scientifically informed marital intimacy advisor.
+   - Topics: Overcoming intimacy barriers, emotional harmony, physical intimacy education, anxiety reduction, and open communication for spouses.
+   - Guidelines: Provide clear, dignified, educational, and behavioral guidance tailored for married couples.`;
+    }
+  }
 
   const privateCandidDirective = isPrivateCandid ? `
 4. BOLD & CANDID PRIVATE CONVERSATIONS MODE (نمط الحوارات الخاصة والصريحة):
@@ -71,16 +113,7 @@ export function filterAndFormatContext(
    - Answer with maximum clarity, sincerity, and open-mindedness without judgement, patronizing lectures, or unnecessary fluff.
    - Treat the conversation as a safe, private space between close friends where feelings, questions, and thoughts are addressed authentically and directly.` : '';
 
-  const specialCounselingDirective = isSpecialCounselingActive ? `
-5. MARITAL INTIMACY & SPECIAL NEEDS COUNSELING MODE (نمط الاستشارة والدعم الزوجي للعلاقة الحميمة):
-   - Active 60-Minute Session: The user has activated a Marital Intimacy & Relationship Support Session (18+ age verified & terms pledged).
-   - Core Purpose: The user seeks guidance, analysis, and solutions for challenges, physical/emotional barriers, anxiety, or special needs in marital intimacy.
-   - Instructions:
-     a) Act as a deeply empathetic, highly knowledgeable, respectful, and objective marital intimacy consultant and relationship counselor.
-     b) Analyze the user's situation, concerns, or questions regarding intimacy with their spouse thoughtfully and candidly.
-     c) Provide clear, direct, practical, scientific, and behavioral solutions, best practices, and actionable steps to help overcome intimacy barriers and enhance physical/emotional connection with their spouse.
-     d) Use bold, clear, respectful, and transparent guidance that provides practical advice while maintaining high educational and supportive quality.
-     e) Offer step-by-step guidance on reducing anxiety, fostering emotional intimacy, physical harmony, and open communication between spouses.` : '';
+  const specialCounselingDirective = consultationDirective;
 
   // Filter memories & items relevant to the current conversation
   const memories = items.filter((i) => i.type === 'memory');

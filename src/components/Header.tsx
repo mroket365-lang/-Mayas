@@ -17,6 +17,7 @@ import {
   LogIn,
   UserCheck,
   Lock,
+  ShieldAlert,
 } from 'lucide-react';
 import { UserProfile, AppLanguage } from '../types';
 import { getTranslation, supportedLanguages } from '../locales/translations';
@@ -30,6 +31,7 @@ interface HeaderProps {
   onOpenPermissions: () => void;
   onOpenSubscription?: () => void;
   onOpenMaritalSupport?: () => void;
+  onOpenConsultationsHub?: () => void;
   onOpenStats?: () => void;
   onOpenAuth?: () => void;
   systemSettings?: SystemPublicSettings | null;
@@ -42,6 +44,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenPermissions,
   onOpenSubscription,
   onOpenMaritalSupport,
+  onOpenConsultationsHub,
   onOpenStats,
   onOpenAuth,
   systemSettings,
@@ -121,23 +124,35 @@ export const Header: React.FC<HeaderProps> = ({
             <LogIn className="w-3.5 h-3.5 shrink-0" />
             <span className="whitespace-nowrap">{isArabic ? 'دخول / تسجيل' : 'Login'}</span>
           </button>
-        ) : onOpenSubscription ? (
+        ) : onOpenSubscription && isFeatureVisible('header_upgrade_button') ? (
           <button
-            onClick={onOpenSubscription}
-            className="flex items-center gap-1 sm:gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-500 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold text-[11px] sm:text-xs shadow-md shadow-amber-500/20 transition-all hover:scale-105 active:scale-95 shrink-0"
+            onClick={() => {
+              if (!isFeatureEnabled('header_upgrade_button')) {
+                triggerLockedPrompt('header_upgrade_button');
+                return;
+              }
+              onOpenSubscription();
+            }}
+            className="relative flex items-center gap-1 sm:gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-500 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold text-[11px] sm:text-xs shadow-md shadow-amber-500/20 transition-all hover:scale-105 active:scale-95 shrink-0"
             title={isArabic ? 'ترقية الاشتراك إلى الخطة المتقدمة' : 'Upgrade to Pro Subscription'}
           >
             <Crown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-100 animate-pulse shrink-0" />
             <span className="whitespace-nowrap">{isArabic ? 'ترقية ✨' : 'Upgrade ✨'}</span>
+            {!isFeatureEnabled('header_upgrade_button') && (
+              <div className="absolute -top-1 -end-1 bg-amber-700 text-white rounded-full p-0.5 shadow-sm">
+                <Lock className="w-2.5 h-2.5" />
+              </div>
+            )}
           </button>
         ) : null}
 
-        {/* 1.5. Stats Modal Quick Trigger (Controlled by action_stats) */}
-        {onOpenStats && isFeatureVisible('action_stats') && (
+        {/* 1.5. Stats Modal Quick Trigger (Controlled by header_stats_button or action_stats) */}
+        {onOpenStats && (isFeatureVisible('header_stats_button') || isFeatureVisible('action_stats')) && (
           <button
             onClick={() => {
-              if (!isFeatureEnabled('action_stats')) {
-                triggerLockedPrompt('action_stats');
+              const featKey = isFeatureVisible('header_stats_button') ? 'header_stats_button' : 'action_stats';
+              if (!isFeatureEnabled(featKey)) {
+                triggerLockedPrompt(featKey);
                 return;
               }
               onOpenStats();
@@ -146,7 +161,7 @@ export const Header: React.FC<HeaderProps> = ({
             title={isArabic ? 'إحصائيات الاستهلاك والإنجاز' : 'Usage & Stats'}
           >
             <BarChart3 className="w-4 h-4 shrink-0" />
-            {!isFeatureEnabled('action_stats') && (
+            {!isFeatureEnabled('header_stats_button') && !isFeatureEnabled('action_stats') && (
               <div className="absolute -top-1 -end-1 bg-amber-500 text-white rounded-full p-0.5 shadow-sm">
                 <Lock className="w-2.5 h-2.5" />
               </div>
@@ -247,6 +262,55 @@ export const Header: React.FC<HeaderProps> = ({
                       {isArabic ? 'إدارة' : 'Manage'}
                     </span>
                   </button>
+
+                  {/* Consultations Hub Trigger */}
+                  {isFeatureVisible('consultations_hub') && onOpenConsultationsHub && (
+                    <button
+                      onClick={() => {
+                        if (!isFeatureEnabled('consultations_hub')) {
+                          triggerLockedPrompt('consultations_hub');
+                          return;
+                        }
+                        setIsToolsMenuOpen(false);
+                        onOpenConsultationsHub();
+                      }}
+                      className="w-full p-2.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-between transition-all"
+                    >
+                      <span className="flex items-center gap-2 min-w-0">
+                        <Sparkles className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
+                        <span className="truncate">{isArabic ? 'مركز الاستشارات المتخصصة' : 'Consultations Hub'}</span>
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-600 font-extrabold whitespace-nowrap shrink-0 flex items-center gap-1">
+                        {!isFeatureEnabled('consultations_hub') && <Lock className="w-2.5 h-2.5" />}
+                        <span>{isArabic ? 'استشارات' : 'Advisory'}</span>
+                      </span>
+                    </button>
+                  )}
+
+                  {/* Admin Panel Portal Trigger */}
+                  {isFeatureVisible('button_admin_panel') && (
+                    <a
+                      href="/admin"
+                      onClick={(e) => {
+                        if (!isFeatureEnabled('button_admin_panel')) {
+                          e.preventDefault();
+                          triggerLockedPrompt('button_admin_panel');
+                          return;
+                        }
+                        setIsToolsMenuOpen(false);
+                      }}
+                      className="w-full p-2.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-between transition-all"
+                    >
+                      <span className="flex items-center gap-2 min-w-0">
+                        <ShieldAlert className="w-4 h-4 text-indigo-500 shrink-0" />
+                        <span className="truncate">{isArabic ? 'لوحة التحكم الإدارية' : 'Admin Panel'}</span>
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-600 font-extrabold whitespace-nowrap shrink-0 flex items-center gap-1">
+                        {!isFeatureEnabled('button_admin_panel') && <Lock className="w-2.5 h-2.5" />}
+                        <span>Admin</span>
+                      </span>
+                    </a>
+                  )}
                 </div>
 
                 {/* Language Selector */}
@@ -279,34 +343,36 @@ export const Header: React.FC<HeaderProps> = ({
                 )}
 
                 {/* Private Candid Conversations Toggle */}
-                {isFeatureVisible('chat_candid') && (
-                  <button
-                    onClick={() => {
-                      if (!isFeatureEnabled('chat_candid')) {
-                        triggerLockedPrompt('chat_candid');
-                        return;
-                      }
-                      onUpdateProfile({
-                        ...profile,
-                        privateCandidMode: !(profile.privateCandidMode || profile.personality === 'bold'),
-                      });
-                    }}
-                    className={`w-full p-2.5 rounded-xl border text-xs font-bold flex items-center justify-between transition-all ${
-                      profile.privateCandidMode || profile.personality === 'bold'
-                        ? 'bg-gradient-to-r from-amber-500/15 to-orange-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400 font-extrabold'
-                        : 'border-[var(--border-color)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--text-main)]'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2 whitespace-nowrap">
-                      <Flame className="w-4 h-4 text-amber-500 animate-pulse shrink-0" />
-                      <span className="whitespace-nowrap">{isArabic ? 'نمط الحوارات الخاصة' : 'Private Candid Mode'}</span>
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 font-bold whitespace-nowrap shrink-0 flex items-center gap-1">
-                      {!isFeatureEnabled('chat_candid') && <Lock className="w-2.5 h-2.5" />}
-                      <span>{profile.privateCandidMode ? (isArabic ? 'مُفعّل' : 'ON') : (isArabic ? 'مُعطّل' : 'OFF')}</span>
-                    </span>
-                  </button>
-                )}
+                {(isFeatureVisible('tool_private_candid') || isFeatureVisible('chat_candid')) &&
+                  systemSettings?.privateCandidAllowed !== false && (
+                    <button
+                      onClick={() => {
+                        const featKey = isFeatureVisible('tool_private_candid') ? 'tool_private_candid' : 'chat_candid';
+                        if (!isFeatureEnabled(featKey)) {
+                          triggerLockedPrompt(featKey);
+                          return;
+                        }
+                        onUpdateProfile({
+                          ...profile,
+                          privateCandidMode: !profile.privateCandidMode,
+                        });
+                      }}
+                      className={`w-full p-2.5 rounded-xl border text-xs font-bold flex items-center justify-between transition-all ${
+                        profile.privateCandidMode
+                          ? 'bg-gradient-to-r from-amber-500/15 to-orange-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400 font-extrabold'
+                          : 'border-[var(--border-color)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--text-main)]'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2 whitespace-nowrap">
+                        <Flame className="w-4 h-4 text-amber-500 animate-pulse shrink-0" />
+                        <span className="whitespace-nowrap">{isArabic ? 'نمط الحوارات الخاصة والشفافية' : 'Private Candid Mode'}</span>
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 font-bold whitespace-nowrap shrink-0 flex items-center gap-1">
+                        {!isFeatureEnabled('tool_private_candid') && !isFeatureEnabled('chat_candid') && <Lock className="w-2.5 h-2.5" />}
+                        <span>{profile.privateCandidMode ? (isArabic ? 'مُفعّل' : 'ON') : (isArabic ? 'مُعطّل' : 'OFF')}</span>
+                      </span>
+                    </button>
+                  )}
 
                 {/* Marital Support Session */}
                 {isFeatureVisible('chat_marital_support') && onOpenMaritalSupport && (

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
 import { getTranslation } from '../locales/translations';
-import { X, Mail, Lock, User, Phone, Sparkles, CheckCircle2, ShieldCheck, LogIn, UserPlus, KeyRound } from 'lucide-react';
+import { X, Mail, Lock, User, Phone, Sparkles, CheckCircle2, ShieldCheck, LogIn, UserPlus, KeyRound, Eye, EyeOff } from 'lucide-react';
 
 interface AuthModalProps {
   profile: UserProfile;
@@ -46,6 +46,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [codeOrToken, setCodeOrToken] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [pendingEmail, setPendingEmail] = useState('');
@@ -589,13 +591,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <div className="relative">
                     <Lock className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2 rtl:right-3 rtl:left-auto" />
                     <input
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••••••"
-                      className="w-full px-9 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-sage)]"
+                      className="w-full ps-9 pe-10 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-sage)]"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rtl:left-3 rtl:right-auto text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors p-1"
+                      title={showPassword ? (isArabic ? 'إخفاء كلمة السر' : 'Hide password') : (isArabic ? 'إظهار كلمة السر' : 'Show password')}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
               </>
@@ -636,13 +646,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <div className="relative">
                     <Lock className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2 rtl:right-3 rtl:left-auto" />
                     <input
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••••••"
-                      className="w-full px-9 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-sage)]"
+                      className="w-full ps-9 pe-10 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-sage)]"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rtl:left-3 rtl:right-auto text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors p-1"
+                      title={showPassword ? (isArabic ? 'إخفاء كلمة السر' : 'Hide password') : (isArabic ? 'إظهار كلمة السر' : 'Show password')}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
               </>
@@ -690,13 +708,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <div className="relative">
                     <Lock className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2 rtl:right-3 rtl:left-auto" />
                     <input
-                      type="password"
+                      type={showNewPassword ? 'text' : 'password'}
                       required
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="••••••••••••"
-                      className="w-full px-9 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-sage)]"
+                      className="w-full ps-9 pe-10 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-sage)]"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rtl:left-3 rtl:right-auto text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors p-1"
+                      title={showNewPassword ? (isArabic ? 'إخفاء كلمة السر' : 'Hide password') : (isArabic ? 'إظهار كلمة السر' : 'Show password')}
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
               </div>

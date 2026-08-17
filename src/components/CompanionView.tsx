@@ -36,12 +36,20 @@ import { AudioWaveform } from './AudioWaveform';
 import { SnippetExtractorModal } from './SnippetExtractorModal';
 import { GuestBanner } from './GuestBanner';
 import { useFeatureGate } from '../context/FeatureGateContext';
+import { CONSULTATION_MODES } from '../constants/consultations';
+import {
+  TrendingUp,
+  Users as UsersIcon,
+  BookOpen,
+  Compass,
+} from 'lucide-react';
 
 interface CompanionViewProps {
   messages: ChatMessage[];
   profile: UserProfile;
   items: CompanionItem[];
   onOpenMaritalSupport?: () => void;
+  onOpenConsultationsHub?: () => void;
   onSendMessage: (
     text: string,
     media?: { base64: string; mimeType: string; name: string; type: 'image' | 'video' | 'audio' }
@@ -249,6 +257,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
   profile,
   items,
   onOpenMaritalSupport,
+  onOpenConsultationsHub,
   onSendMessage,
   isLoading,
   onOpenPermissions,
@@ -713,84 +722,101 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
         />
       )}
 
-      {(profile.privateCandidMode || profile.personality === 'bold') && (
-        <div className="mx-3 mt-2 px-3.5 py-2 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-rose-500/15 border border-amber-500/30 text-[11px] font-bold text-amber-600 dark:text-amber-400 flex items-center justify-between gap-2 shadow-sm animate-fade-in shrink-0">
-          <div className="flex items-center gap-2">
-            <Flame className="w-4 h-4 text-amber-500 animate-pulse shrink-0" />
-            <span>
-              {profile.language === 'ar'
-                ? 'نمط الحوارات الخاصة والصريحة مفعّل: الذكاء الاصطناعي يتفاعل معك بجرأة وصدق وشفافية تامّة.'
-                : 'Private Candid Mode Enabled: Bold, direct & transparent AI responses active.'}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {profile.specialCounselingEnabled &&
-        profile.specialCounselingExpiresAt &&
-        new Date(profile.specialCounselingExpiresAt).getTime() > Date.now() && (
-          <div
-            onClick={onOpenMaritalSupport}
-            className="mx-3 mt-2 px-3.5 py-2 rounded-2xl bg-gradient-to-r from-rose-500/15 via-pink-500/15 to-amber-500/15 border border-rose-500/40 text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center justify-between gap-2 shadow-sm animate-fade-in shrink-0 cursor-pointer hover:border-rose-500 transition-all"
-          >
-            <div className="flex items-center gap-2">
-              <HeartHandshake className="w-4 h-4 text-rose-500 animate-pulse shrink-0" />
-              <span>
-                {profile.language === 'ar'
-                  ? 'جلسة الاستشارة والدعم الزوجي نشطة: يمكنك طرح أسئلتك حول العلاقة الحميمة بوضوح وصراحة للحصول على إرشادات مخصصة.'
-                  : 'Marital Support Session Active: Ask questions with complete clarity for direct guidance.'}
-              </span>
+      {/* Streamlined Discreet Top Indicator Bar */}
+      <div className="flex items-center justify-between px-3 pt-2 gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Candid Mode Compact Pill */}
+          {profile.privateCandidMode && (
+            <div
+              className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1 shadow-2xs"
+              title={
+                profile.language === 'ar'
+                  ? 'نمط الحوارات الخاصة والصريحة مفعّل'
+                  : 'Private Candid Mode Enabled'
+              }
+            >
+              <Flame className="w-3 h-3 text-amber-500 animate-pulse shrink-0" />
+              <span>{profile.language === 'ar' ? 'وضع المصارحة' : 'Candid Mode'}</span>
             </div>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-600 font-extrabold shrink-0">
-              {profile.language === 'ar' ? 'عرض الجلسة' : 'View'}
-            </span>
-          </div>
-        )}
-
-      {/* Focus Mode Banner & Controls */}
-      {isFocusMode ? (
-        <div className="mx-3 mt-2 px-3.5 py-1.5 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 text-[11px] font-bold text-indigo-600 dark:text-indigo-300 flex items-center justify-between gap-2 shadow-xs animate-fade-in shrink-0">
-          <div className="flex items-center gap-2">
-            <Maximize2 className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-            <span>
-              {profile.language === 'ar'
-                ? 'وضع التركيز مفعّل: تم إخفاء شريط التنقل السفلي لمساحة عرض أوسع.'
-                : 'Focus Mode active: Bottom navigation hidden for larger view.'}
-            </span>
-          </div>
-          {onToggleFocusMode && (
-            <button
-              onClick={onToggleFocusMode}
-              className="px-2.5 py-1 rounded-xl bg-indigo-600 text-white text-[10px] font-bold hover:bg-indigo-700 transition-all flex items-center gap-1 shrink-0 shadow-xs"
-            >
-              <Minimize2 className="w-3 h-3" />
-              <span>{profile.language === 'ar' ? 'إلغاء التركيز' : 'Exit Focus'}</span>
-            </button>
           )}
-        </div>
-      ) : (
-        isFeatureVisible('feature_focus_mode') && onToggleFocusMode && (
-          <div className="flex justify-end px-3 mt-1.5 shrink-0">
-            <button
-              onClick={() => {
-                if (!isFeatureEnabled('feature_focus_mode')) {
-                  triggerLockedPrompt('feature_focus_mode');
-                  return;
+
+          {/* Active Consultation Session Compact Pill */}
+          {(() => {
+            const activeType = profile.activeConsultationType || (profile.specialCounselingEnabled ? 'marital' : 'none');
+            const expiresAt = profile.activeConsultationExpiresAt || profile.specialCounselingExpiresAt;
+            const isConsultActive =
+              activeType !== 'none' &&
+              (!expiresAt || new Date(expiresAt).getTime() > Date.now());
+
+            if (!isConsultActive) return null;
+
+            const config = CONSULTATION_MODES[activeType];
+            if (!config) return null;
+
+            return (
+              <button
+                onClick={() => {
+                  if (activeType === 'marital' && onOpenMaritalSupport) {
+                    onOpenMaritalSupport();
+                  } else if (onOpenConsultationsHub) {
+                    onOpenConsultationsHub();
+                  }
+                }}
+                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1.5 shadow-2xs transition-all border ${config.badgeBg}`}
+                title={
+                  profile.language === 'ar'
+                    ? `جلسة ${config.nameAr} نشطة - انقر للتفاصيل`
+                    : `${config.nameEn} Active - Click for details`
                 }
-                onToggleFocusMode();
-              }}
-              className="px-2.5 py-1 rounded-xl bg-[var(--bg-hover)] border border-[var(--border-color)] text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--accent-sage)] transition-all flex items-center gap-1.5 shadow-2xs"
-              title={profile.language === 'ar' ? 'تنشيط وضع التركيز لإخفاء شريط التنقل' : 'Activate Focus Mode'}
-            >
+              >
+                {activeType === 'marital' && <HeartHandshake className="w-3 h-3 text-rose-500 animate-pulse shrink-0" />}
+                {activeType === 'financial' && <TrendingUp className="w-3 h-3 text-emerald-500 animate-pulse shrink-0" />}
+                {activeType === 'family' && <UsersIcon className="w-3 h-3 text-amber-500 animate-pulse shrink-0" />}
+                {activeType === 'religious' && <BookOpen className="w-3 h-3 text-cyan-500 animate-pulse shrink-0" />}
+                {activeType === 'political' && <Compass className="w-3 h-3 text-purple-500 animate-pulse shrink-0" />}
+                {activeType === 'psychological' && <Sparkles className="w-3 h-3 text-indigo-500 animate-pulse shrink-0" />}
+                <span>{profile.language === 'ar' ? config.badgeText : config.nameEn}</span>
+              </button>
+            );
+          })()}
+        </div>
+
+        {/* Small Discreet Focus Mode Icon Button (No large distracting banners) */}
+        {isFeatureVisible('feature_focus_mode') && onToggleFocusMode && (
+          <button
+            onClick={() => {
+              if (!isFeatureEnabled('feature_focus_mode')) {
+                triggerLockedPrompt('feature_focus_mode');
+                return;
+              }
+              onToggleFocusMode();
+            }}
+            className={`p-1.5 rounded-xl border transition-all text-xs font-semibold flex items-center gap-1 ${
+              isFocusMode
+                ? 'bg-indigo-600 text-white border-indigo-500 shadow-xs'
+                : 'bg-[var(--bg-hover)] border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--accent-sage)]'
+            }`}
+            title={
+              isFocusMode
+                ? profile.language === 'ar'
+                  ? 'إلغاء وضع التركيز (إظهار شريط التنقل)'
+                  : 'Exit Focus Mode'
+                : profile.language === 'ar'
+                ? 'وضع التركيز (إخفاء شريط التنقل)'
+                : 'Focus Mode'
+            }
+          >
+            {isFocusMode ? (
+              <Minimize2 className="w-3.5 h-3.5" />
+            ) : (
               <Maximize2 className="w-3.5 h-3.5 text-[var(--accent-sage)]" />
-              <span>{profile.language === 'ar' ? 'وضع التركيز' : 'Focus Mode'}</span>
-              {!isFeatureEnabled('feature_focus_mode') && (
-                <Lock className="w-3 h-3 text-amber-500 ms-0.5" />
-              )}
-            </button>
-          </div>
-        )
-      )}
+            )}
+            {!isFeatureEnabled('feature_focus_mode') && (
+              <Lock className="w-2.5 h-2.5 text-amber-500" />
+            )}
+          </button>
+        )}
+      </div>
 
       {/* Messages Scroll Area */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 pb-12 sm:pb-16">

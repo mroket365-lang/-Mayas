@@ -8,7 +8,21 @@ import {
 } from '../types';
 import { defaultFeaturesList } from '../constants/defaultFeatures';
 import { realtimeClient } from '../services/realtimeClient';
-import { Lock, Sparkles, LogIn, Crown, Clock, CheckCircle, ArrowRight, X } from 'lucide-react';
+import {
+  Lock,
+  Sparkles,
+  LogIn,
+  Crown,
+  Clock,
+  CheckCircle,
+  ArrowRight,
+  X,
+  Wrench,
+  Rocket,
+  AlertTriangle,
+  Info,
+  ShieldCheck,
+} from 'lucide-react';
 
 interface FeatureGateContextType {
   features: FeatureRuleConfig[];
@@ -125,6 +139,46 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
     );
 
     for (const feature of features) {
+      // 0. Maintenance Mode / Coming Soon explicit locked behavior
+      if (feature.lockedBehavior === 'maintenance') {
+        result[feature.id] = {
+          id: feature.id,
+          name: feature.nameAr,
+          icon: feature.icon,
+          enabled: false,
+          locked: true,
+          lockedBehavior: 'maintenance',
+          reason: 'maintenance',
+          lockTitle: feature.customLockTitle || 'الميزة تحت الصيانة والتحسينات 🛠️',
+          lockMessage:
+            feature.maintenanceMessage ||
+            feature.customLockMessage ||
+            'نعمل حالياً على تطوير وتحديث هذه الميزة لتقديم أداء أفضل وتجربة مميزة، وسنعاود إتاحتها فور اكتمال التحديثات. شكراً لتفهمكم وصبركم ✨',
+          customBadge: feature.customBadge || 'maintenance',
+          customBadgeText: feature.customBadgeText,
+        };
+        continue;
+      }
+
+      if (feature.lockedBehavior === 'coming_soon') {
+        result[feature.id] = {
+          id: feature.id,
+          name: feature.nameAr,
+          icon: feature.icon,
+          enabled: false,
+          locked: true,
+          lockedBehavior: 'coming_soon',
+          reason: 'coming_soon',
+          lockTitle: feature.customLockTitle || 'قريباً جداً 🚀',
+          lockMessage:
+            feature.customLockMessage ||
+            'ترقبوا إطلاق هذه الميزة قريباً! نعمل على تجهيزها لتمنحكم تجربة استثنائية.',
+          customBadge: feature.customBadge || 'coming_soon',
+          customBadgeText: feature.customBadgeText,
+        };
+        continue;
+      }
+
       // 1. Audience
       if (feature.targetAudience === 'disabled') {
         result[feature.id] = {
@@ -135,7 +189,10 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
           locked: true,
           lockedBehavior: feature.lockedBehavior,
           reason: 'disabled',
-          lockMessage: 'هذه الميزة معطلة مؤقتاً للصيانة أو التطوير',
+          lockTitle: feature.customLockTitle || 'الميزة معطلة مؤقتاً',
+          lockMessage: feature.customLockMessage || 'هذه الميزة معطلة مؤقتاً للصيانة أو التطوير',
+          customBadge: feature.customBadge,
+          customBadgeText: feature.customBadgeText,
         };
         continue;
       }
@@ -155,7 +212,10 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
             locked: true,
             lockedBehavior: feature.lockedBehavior,
             reason: 'specific_users_only',
+            lockTitle: feature.customLockTitle || 'ميزة خاصة ومحددة',
             lockMessage: feature.customLockMessage || 'هذه الميزة متاحة فقط لمستخدمين محددين تجريبياً',
+            customBadge: feature.customBadge,
+            customBadgeText: feature.customBadgeText,
           };
           continue;
         }
@@ -171,15 +231,21 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
             locked: true,
             lockedBehavior: feature.lockedBehavior,
             reason: 'requires_auth',
+            lockTitle: feature.customLockTitle || 'تسجيل الدخول مطلوب 🔑',
             lockMessage: feature.customLockMessage || 'يرجى تسجيل الدخول أو إنشاء حساب للوصول لهذه الميزة',
+            customBadge: feature.customBadge,
+            customBadgeText: feature.customBadgeText,
           };
           continue;
         }
       }
 
-      // 2. Plan Tier
-      if (feature.allowedPlans && feature.allowedPlans.length > 0 && !feature.allowedPlans.includes('all')) {
-        if (!feature.allowedPlans.includes(currentPlanId)) {
+      // 2. Plan Tier Requirement (Supports 'none' / hidden from all plans)
+      if (feature.allowedPlans) {
+        const plans = feature.allowedPlans;
+        const isNone = plans.includes('none') || plans.length === 0;
+
+        if (isNone) {
           result[feature.id] = {
             id: feature.id,
             name: feature.nameAr,
@@ -188,15 +254,68 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
             locked: true,
             lockedBehavior: feature.lockedBehavior,
             reason: 'plan_restricted',
+            lockTitle: feature.customLockTitle || 'غير متاحة للباقات',
+            lockMessage:
+              feature.customLockMessage || 'هذه الميزة معطلة حالياً لكافة الباقات والخطط',
+            customBadge: feature.customBadge,
+            customBadgeText: feature.customBadgeText,
+          };
+          continue;
+        }
+
+        if (!plans.includes('all') && !plans.includes(currentPlanId)) {
+          result[feature.id] = {
+            id: feature.id,
+            name: feature.nameAr,
+            icon: feature.icon,
+            enabled: false,
+            locked: true,
+            lockedBehavior: feature.lockedBehavior,
+            reason: 'plan_restricted',
+            lockTitle: feature.customLockTitle || 'ترقية الخطة مطلوبة 👑',
             lockMessage:
               feature.customLockMessage ||
-              `هذه الميزة متاحة في الخطط المتقدمة (${feature.allowedPlans.join(' / ')})`,
+              `هذه الميزة متاحة في الخطط المتقدمة (${plans.join(' / ')})`,
+            customBadge: feature.customBadge,
+            customBadgeText: feature.customBadgeText,
           };
           continue;
         }
       }
 
-      // 3. Progressive Disclosure
+      // 3. Language & Platform Targeting
+      if (feature.languageTarget && feature.languageTarget !== 'all') {
+        if (feature.languageTarget === 'ar_only' && profile.language !== 'ar') {
+          result[feature.id] = {
+            id: feature.id,
+            name: feature.nameAr,
+            icon: feature.icon,
+            enabled: false,
+            locked: true,
+            lockedBehavior: feature.lockedBehavior,
+            reason: 'language_mismatch',
+            lockTitle: 'متاحة باللغة العربية',
+            lockMessage: 'هذه الميزة مخصصة لواجهة اللغة العربية حالياً',
+          };
+          continue;
+        }
+        if (feature.languageTarget === 'en_only' && profile.language !== 'en') {
+          result[feature.id] = {
+            id: feature.id,
+            name: feature.nameAr,
+            icon: feature.icon,
+            enabled: false,
+            locked: true,
+            lockedBehavior: feature.lockedBehavior,
+            reason: 'language_mismatch',
+            lockTitle: 'English Only Feature',
+            lockMessage: 'This feature is currently enabled for English language mode.',
+          };
+          continue;
+        }
+      }
+
+      // 4. Progressive Disclosure
       if (feature.progressiveDisclosure && feature.progressiveDisclosure.enabled) {
         if (feature.progressiveDisclosure.minAccountAgeDays > 0) {
           const accountCreation = (profile as any).createdAt;
@@ -212,9 +331,12 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
                 locked: true,
                 lockedBehavior: feature.lockedBehavior,
                 reason: 'progressive_time_locked',
+                lockTitle: feature.customLockTitle || 'تفتح تدريجياً ✨',
                 lockMessage:
                   feature.customLockMessage ||
                   `ستفتح هذه الميزة بعد ${remaining} يوم من استخدامك المستمر للتطبيق ✨`,
+                customBadge: feature.customBadge,
+                customBadgeText: feature.customBadgeText,
               };
               continue;
             }
@@ -232,9 +354,12 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
               locked: true,
               lockedBehavior: feature.lockedBehavior,
               reason: 'progressive_messages_locked',
+              lockTitle: feature.customLockTitle || 'تفتح مع التفاعل 💬',
               lockMessage:
                 feature.customLockMessage ||
                 `أرسل ${needed} رسائل إضافية للرفيق لفتح هذه الميزة تلقائياً ✨`,
+              customBadge: feature.customBadge,
+              customBadgeText: feature.customBadgeText,
             };
             continue;
           }
@@ -251,16 +376,19 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
               locked: true,
               lockedBehavior: feature.lockedBehavior,
               reason: 'progressive_tasks_locked',
+              lockTitle: feature.customLockTitle || 'تفتح مع إنجاز المهام 🎯',
               lockMessage:
                 feature.customLockMessage ||
                 `أنجز ${needed} مهام إضافية لفتح هذه الأداة تلقائياً ✨`,
+              customBadge: feature.customBadge,
+              customBadgeText: feature.customBadgeText,
             };
             continue;
           }
         }
       }
 
-      // 4. Time Window
+      // 5. Time Window
       if (feature.timeWindow && feature.timeWindow.enabled) {
         const now = Date.now();
         if (feature.timeWindow.startDate && new Date(feature.timeWindow.startDate).getTime() > now) {
@@ -272,7 +400,10 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
             locked: true,
             lockedBehavior: feature.lockedBehavior,
             reason: 'outside_time_window',
+            lockTitle: feature.customLockTitle || 'الميزة ستبدأ قريباً',
             lockMessage: feature.customLockMessage || 'هذه الميزة ستبدأ قريباً في الموعد المحدد',
+            customBadge: feature.customBadge,
+            customBadgeText: feature.customBadgeText,
           };
           continue;
         }
@@ -285,7 +416,10 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
             locked: true,
             lockedBehavior: feature.lockedBehavior,
             reason: 'outside_time_window',
-            lockMessage: feature.customLockMessage || 'انتهت الفترة المحددة لهذه الميزة',
+            lockTitle: feature.customLockTitle || 'انتهت الفترة المحددة',
+            lockMessage: feature.customLockMessage || 'انتهت الفترة المحددة لإتاحة هذه الميزة',
+            customBadge: feature.customBadge,
+            customBadgeText: feature.customBadgeText,
           };
           continue;
         }
@@ -300,6 +434,8 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
         locked: false,
         lockedBehavior: feature.lockedBehavior,
         reason: 'ok',
+        customBadge: feature.customBadge,
+        customBadgeText: feature.customBadgeText,
       };
     }
 
@@ -382,7 +518,7 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
     const status = evaluatedFeatures[canonical] || evaluatedFeatures[featureId];
     if (!status) return true;
     if (status.enabled) return true;
-    return status.lockedBehavior === 'badge_lock';
+    return status.lockedBehavior !== 'hide';
   };
 
   const getFeatureStatus = (featureId: string): EvaluatedFeatureStatus | undefined => {
@@ -421,7 +557,7 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
 
       {/* Feature Locked Information & Upgrade Modal */}
       {activeLockedFeatureId && lockedFeatureStatus && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-md animate-fade-in">
           <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-3xl p-6 max-w-md w-full shadow-2xl relative space-y-5 text-center">
             {/* Close Button */}
             <button
@@ -431,57 +567,99 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
               <X className="w-5 h-5" />
             </button>
 
-            {/* Lock Icon Banner */}
-            <div className="mx-auto w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-500 flex items-center justify-center shadow-lg">
-              <Lock className="w-8 h-8 animate-bounce" />
-            </div>
+            {/* Modal Hero Icon Banner */}
+            {lockedFeatureStatus.reason === 'maintenance' || lockedFeatureConfig?.lockedBehavior === 'maintenance' ? (
+              <div className="mx-auto w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-500 flex items-center justify-center shadow-lg">
+                <Wrench className="w-8 h-8 animate-pulse" />
+              </div>
+            ) : lockedFeatureStatus.reason === 'coming_soon' || lockedFeatureConfig?.lockedBehavior === 'coming_soon' ? (
+              <div className="mx-auto w-16 h-16 rounded-2xl bg-purple-500/15 border border-purple-500/30 text-purple-400 flex items-center justify-center shadow-lg">
+                <Rocket className="w-8 h-8 animate-bounce" />
+              </div>
+            ) : lockedFeatureStatus.reason === 'requires_auth' ? (
+              <div className="mx-auto w-16 h-16 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shadow-lg">
+                <LogIn className="w-8 h-8" />
+              </div>
+            ) : lockedFeatureStatus.reason === 'plan_restricted' ? (
+              <div className="mx-auto w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shadow-lg">
+                <Crown className="w-8 h-8 animate-bounce" />
+              </div>
+            ) : (
+              <div className="mx-auto w-16 h-16 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 flex items-center justify-center shadow-lg">
+                <Lock className="w-8 h-8" />
+              </div>
+            )}
 
             {/* Title & Description */}
             <div className="space-y-1.5">
               <h3 className="text-lg font-extrabold text-[var(--text-main)]">
-                {lockedFeatureConfig?.nameAr || lockedFeatureStatus.name}
+                {lockedFeatureStatus.lockTitle ||
+                  (lockedFeatureStatus.reason === 'maintenance'
+                    ? 'الميزة تحت الصيانة والتحسينات 🛠️'
+                    : lockedFeatureStatus.reason === 'coming_soon'
+                    ? 'قريباً جداً 🚀'
+                    : lockedFeatureConfig?.nameAr || lockedFeatureStatus.name)}
               </h3>
               <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                {lockedFeatureStatus.lockMessage || lockedFeatureConfig?.descriptionAr || 'هذه الميزة تتطلب تفعيل الخطة أو استيفاء الشروط المحددة'}
+                {lockedFeatureStatus.lockMessage ||
+                  lockedFeatureConfig?.descriptionAr ||
+                  'هذه الميزة مقفلة حالياً بناءً على إعدادات النظام'}
               </p>
             </div>
 
-            {/* Status Reason Callout */}
+            {/* Status Details / Reassurance Callout */}
             <div className="p-3.5 rounded-2xl bg-[var(--bg-main)] border border-[var(--border-color)] text-xs text-start space-y-2">
-              <div className="flex items-center gap-2 font-bold text-[var(--text-main)]">
-                <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
-                <span>كيفية فتح هذه الميزة:</span>
-              </div>
-
-              {lockedFeatureStatus.reason === 'requires_auth' && (
+              {lockedFeatureStatus.reason === 'maintenance' || lockedFeatureConfig?.lockedBehavior === 'maintenance' ? (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 font-bold text-amber-500">
+                    <Wrench className="w-4 h-4 shrink-0" />
+                    <span>أعمال صيانة وتطوير جارية</span>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+                    فريق التطوير يعمل على ترقية وتحسين هذه الأداة لتقديم أفضل استجابة. كافة بياناتك ومهامك محفوظة وسيعود الزر للعمل تلقائياً فور انتهاء التحديثات.
+                  </p>
+                </div>
+              ) : lockedFeatureStatus.reason === 'coming_soon' || lockedFeatureConfig?.lockedBehavior === 'coming_soon' ? (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 font-bold text-purple-400">
+                    <Rocket className="w-4 h-4 shrink-0" />
+                    <span>ميزة جديدة في طور الإطلاق</span>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+                    نقوم بتجهيز واختبار هذه الميزة المبتكرة لضمان تجربة فريدة، ترقبوا تفعيلها قريباً!
+                  </p>
+                </div>
+              ) : lockedFeatureStatus.reason === 'requires_auth' ? (
                 <div className="flex items-start gap-2 text-[var(--text-muted)] text-[11px]">
                   <LogIn className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                  <span>قم بتسجيل الدخول أو إنشاء حسابك المجاني لتفعيل هذه الميزة فوراً وحفظ بياناتك سحابياً.</span>
+                  <span>قم بتسجيل الدخول أو إنشاء حسابك المجاني لتفعيل هذه الميزة فوراً ومزامنة بياناتك سحابياً.</span>
                 </div>
-              )}
-
-              {lockedFeatureStatus.reason === 'plan_restricted' && (
-                <div className="flex items-start gap-2 text-[var(--text-muted)] text-[11px]">
-                  <Crown className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                  <span>
-                    هذه الميزة مخصصة للخطط المتقدمة ({lockedFeatureConfig?.allowedPlans?.join(' / ')}). قم بترقية اشتراكك للاستمتاع بها بلا قيود.
-                  </span>
+              ) : lockedFeatureStatus.reason === 'plan_restricted' ? (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 font-bold text-amber-400">
+                    <Crown className="w-4 h-4 shrink-0" />
+                    <span>مخصصة للباقات المتقدمة</span>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+                    {lockedFeatureConfig?.allowedPlans?.includes('none')
+                      ? 'هذه الميزة معطلة حالياً في كافة الباقات.'
+                      : `هذه الميزة متاحة لمشتركي الخطط المتقدمة (${lockedFeatureConfig?.allowedPlans?.join(' / ')}).`}
+                  </p>
                 </div>
-              )}
-
-              {lockedFeatureStatus.reason === 'progressive_messages_locked' && (
+              ) : lockedFeatureStatus.reason === 'progressive_messages_locked' ? (
                 <div className="flex items-start gap-2 text-[var(--text-muted)] text-[11px]">
                   <Clock className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
-                  <span>
-                    الاستمرار في الدردشة مع الرفيق يفتح ميزات إضافية تدريجياً لضمان تجربة سهلة وسلسة!
-                  </span>
+                  <span>الاستمرار في الدردشة مع الرفيق يفتح ميزات إضافية تدريجياً لضمان تجربة سهلة وسلسة!</span>
                 </div>
-              )}
-
-              {lockedFeatureStatus.reason === 'progressive_tasks_locked' && (
+              ) : lockedFeatureStatus.reason === 'progressive_tasks_locked' ? (
                 <div className="flex items-start gap-2 text-[var(--text-muted)] text-[11px]">
                   <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                  <span>أنجز المزيد من مهامك اليومية لترقية مستوى رفيقك الذكي.</span>
+                  <span>أنجز المزيد من مهامك اليومية لترقية مستوى رفيقك وفتح المزيد من الأدوات.</span>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2 text-[var(--text-muted)] text-[11px]">
+                  <ShieldCheck className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+                  <span>{lockedFeatureStatus.lockMessage || 'هذه الميزة تتطلب تفعيل الخطة أو استيفاء الشروط المحددة.'}</span>
                 </div>
               )}
             </div>
@@ -501,24 +679,32 @@ export const FeatureGateProvider: React.FC<FeatureGateProviderProps> = ({
                 </button>
               )}
 
-              {lockedFeatureStatus.reason === 'plan_restricted' && onOpenSubscription && (
-                <button
-                  onClick={() => {
-                    setActiveLockedFeatureId(null);
-                    onOpenSubscription();
-                  }}
-                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 text-white font-extrabold text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2"
-                >
-                  <Crown className="w-4 h-4" />
-                  <span>ترقية الخطة الآن ✨</span>
-                </button>
-              )}
+              {lockedFeatureStatus.reason === 'plan_restricted' &&
+                !lockedFeatureConfig?.allowedPlans?.includes('none') &&
+                onOpenSubscription && (
+                  <button
+                    onClick={() => {
+                      setActiveLockedFeatureId(null);
+                      onOpenSubscription();
+                    }}
+                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 text-white font-extrabold text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Crown className="w-4 h-4" />
+                    <span>ترقية الخطة الآن ✨</span>
+                  </button>
+                )}
 
               <button
                 onClick={() => setActiveLockedFeatureId(null)}
-                className="w-full py-2.5 px-4 rounded-xl bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--text-muted)] font-bold text-xs border border-[var(--border-color)] transition-all"
+                className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs border transition-all ${
+                  lockedFeatureStatus.reason === 'maintenance' || lockedFeatureConfig?.lockedBehavior === 'maintenance'
+                    ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30'
+                    : 'bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--text-muted)] border-[var(--border-color)]'
+                }`}
               >
-                حسناً، فهمت
+                {lockedFeatureStatus.reason === 'maintenance' || lockedFeatureConfig?.lockedBehavior === 'maintenance'
+                  ? 'حسناً، بانتظار التحديث 👍'
+                  : 'حسناً، فهمت'}
               </button>
             </div>
           </div>
@@ -593,11 +779,14 @@ export const FeatureGate: React.FC<FeatureGateProps> = ({
     return <>{children}</>;
   }
 
-  if (isVisible && status && status.lockedBehavior === 'badge_lock') {
+  if (isVisible && status && status.lockedBehavior !== 'hide') {
     if (lockedFallback) {
       return <>{lockedFallback({ onUnlock: triggerLockedPrompt, status })}</>;
     }
     // Default locked wrapper with lock overlay/badge
+    const isMaintenance = status.lockedBehavior === 'maintenance';
+    const isComingSoon = status.lockedBehavior === 'coming_soon';
+
     return (
       <div
         onClick={(e) => {
@@ -607,11 +796,25 @@ export const FeatureGate: React.FC<FeatureGateProps> = ({
         }}
         className="relative cursor-pointer group"
       >
-        <div className="opacity-60 pointer-events-none filter grayscale-[40%]">
+        <div className="opacity-60 pointer-events-none filter grayscale-[35%]">
           {children}
         </div>
-        <div className="absolute top-1 end-1 bg-amber-500 text-white rounded-full p-1 shadow-md shadow-amber-500/30 group-hover:scale-110 transition-transform">
-          <Lock className="w-3 h-3" />
+        <div
+          className={`absolute top-1 end-1 rounded-full p-1 shadow-md transition-transform group-hover:scale-110 ${
+            isMaintenance
+              ? 'bg-amber-600 text-white shadow-amber-600/30'
+              : isComingSoon
+              ? 'bg-purple-600 text-white shadow-purple-600/30'
+              : 'bg-amber-500 text-white shadow-amber-500/30'
+          }`}
+        >
+          {isMaintenance ? (
+            <Wrench className="w-3 h-3" />
+          ) : isComingSoon ? (
+            <Rocket className="w-3 h-3" />
+          ) : (
+            <Lock className="w-3 h-3" />
+          )}
         </div>
       </div>
     );

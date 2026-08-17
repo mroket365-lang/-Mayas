@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Crown, CheckCircle2, Sparkles, Zap, Shield, X, CreditCard, Building2, Wallet, Send, Check } from 'lucide-react';
+import { Crown, CheckCircle2, Sparkles, Zap, Shield, X, CreditCard, Building2, Wallet, Send, Check, MapPin, Upload, FileText } from 'lucide-react';
 import { UserProfile } from '../types';
 
 interface SubscriptionModalProps {
@@ -16,11 +16,84 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
   const [plans, setPlans] = useState<any[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [selectedMethodId, setSelectedMethodId] = useState<string>('stripe');
-  const [transferRefNumber, setTransferRefNumber] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const [processingPlanId, setProcessingPlanId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'checkout' | 'receipt'>('checkout');
+
+  // Location tracking state
+  const [userCountryCode, setUserCountryCode] = useState<string>('SA');
+  const [userCountryName, setUserCountryName] = useState<string>('المملكة العربية السعودية');
+  const [userCity, setUserCity] = useState<string>('');
+  const [locationPermissionStatus, setLocationPermissionStatus] = useState<string>('unknown');
+
+  // Manual Receipt Form State
+  const [receiptPlanId, setReceiptPlanId] = useState<string>('premium');
+  const [receiptRef, setReceiptRef] = useState<string>('');
+  const [receiptMethodName, setReceiptMethodName] = useState<string>('تحويل بانكي / الراجحي');
+  const [receiptNote, setReceiptNote] = useState<string>('');
+  const [receiptSubmitting, setReceiptSubmitting] = useState(false);
+  const [receiptSuccessMsg, setReceiptSuccessMsg] = useState<string | null>(null);
+
+  // Auto-detect Geolocation
+  const detectUserLocation = () => {
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          setLocationPermissionStatus('granted');
+
+          try {
+            const geoRes = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=ar`);
+            let country = 'السعودية';
+            let countryCode = 'SA';
+            let city = '';
+            if (geoRes.ok) {
+              const geoData = await geoRes.json();
+              country = geoData.countryName || 'السعودية';
+              countryCode = geoData.countryCode || 'SA';
+              city = geoData.city || geoData.locality || '';
+            }
+
+            setUserCountryCode(countryCode);
+            setUserCountryName(country);
+            setUserCity(city);
+
+            await fetch('/api/user/location', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId,
+                latitude: lat,
+                longitude: lng,
+                country,
+                countryCode,
+                city,
+                locationStatus: 'granted',
+              }),
+            });
+          } catch (e) {
+            console.error('Reverse geocode error:', e);
+          }
+        },
+        async (error) => {
+          console.warn('Geolocation permission denied or error:', error.message);
+          setLocationPermissionStatus('denied');
+          await fetch('/api/user/location', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId,
+              locationStatus: 'denied',
+            }),
+          });
+        },
+        { timeout: 8000 }
+      );
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -44,7 +117,9 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
 
       if (plansRes.ok) {
         const plansJson = await plansRes.json();
-        setPlans(plansJson.filter((p: any) => p.active));
+        const activePlans = plansJson.filter((p: any) => p.active);
+        setPlans(activePlans);
+        if (activePlans.length > 0) setReceiptPlanId(activePlans[0].id);
       }
 
       if (methodsRes.ok) {
@@ -64,8 +139,8 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
   useEffect(() => {
     setLoading(true);
     fetchData();
+    detectUserLocation();
 
-    // Listen for realtime server push and local admin updates (< 1s sync)
     const handleRealtimeUpdate = () => {
       fetchData();
     };
@@ -87,6 +162,14 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
 
   const selectedMethod = paymentMethods.find((m) => m.id === selectedMethodId);
 
+  // Filter plans based on regional configuration
+  const visiblePlans = plans.filter((p) => {
+    if (!p.targetRegions || p.targetRegions.length === 0 || p.targetRegions.includes('ALL')) {
+      return true;
+    }
+    return p.targetRegions.includes(userCountryCode);
+  });
+
   const handleCheckout = async (planId: string) => {
     setProcessingPlanId(planId);
     setMessage(null);
@@ -100,7 +183,6 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
           planId,
           billingCycle,
           paymentProvider: selectedMethodId || 'stripe',
-          transferReference: transferRefNumber || undefined,
         }),
       });
 
@@ -113,7 +195,6 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
           : 'Subscription upgraded successfully! Enjoy unlimited AI capabilities 🎉'
       );
 
-      // Re-fetch status
       const statusRes = await fetch(`/api/subscription/status?userId=${userId}`);
       if (statusRes.ok) {
         const statusJson = await statusRes.json();
@@ -131,6 +212,52 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
     }
   };
 
+  const handleReceiptSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!receiptRef.trim()) return;
+    setReceiptSubmitting(true);
+    setReceiptSuccessMsg(null);
+
+    try {
+      const chosenPlan = plans.find((p) => p.id === receiptPlanId) || { name: 'باقة رفيق', monthlyPrice: 19, yearlyPrice: 180, currency: 'USD' };
+      const amount = billingCycle === 'monthly' ? chosenPlan.monthlyPrice : chosenPlan.yearlyPrice;
+
+      const res = await fetch('/api/subscriptions/submit-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          userEmail: profile.email || 'user@example.com',
+          userName: profile.name || 'المستخدم',
+          planId: receiptPlanId,
+          planName: chosenPlan.name,
+          amountPaid: amount,
+          currency: chosenPlan.currency || 'USD',
+          billingCycle,
+          transactionReference: receiptRef,
+          paymentMethodName: receiptMethodName,
+          receiptNote: receiptNote || 'تم رفع إيصال الدفع اليدوي',
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to submit receipt');
+
+      setReceiptSuccessMsg(
+        isArabic
+          ? 'تم إرسال إيصال السداد بنجاح! جاري المراجعة والتحقق من قبل الإدارة وتفعيل اشتراكك ⏳'
+          : 'Receipt submitted successfully! Pending verification by support ⏳'
+      );
+      setReceiptRef('');
+      setReceiptNote('');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to submit';
+      setReceiptSuccessMsg(`خطأ: ${msg}`);
+    } finally {
+      setReceiptSubmitting(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-fade-in">
       <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-5 md:p-8 space-y-6 shadow-2xl">
@@ -141,11 +268,16 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
               <Crown className="w-6 h-6 animate-pulse" />
             </div>
             <div>
-              <h2 className="text-lg md:text-xl font-bold text-[var(--text-main)]">
-                {isArabic ? 'ترقية الاشتراك إلى رفيق المتقدم' : 'Rafiq Premium Subscription Upgrade'}
+              <h2 className="text-lg md:text-xl font-bold text-[var(--text-main)] flex items-center gap-2">
+                <span>{isArabic ? 'باقات الاشتراك وطرق الدفع والتحقق' : 'Subscription Plans & Payments'}</span>
               </h2>
-              <p className="text-xs text-[var(--text-muted)]">
-                {isArabic ? 'محادثات غير محدودة، سرعة فائقة ودعم لجميع نماذج الذكاء الاصطناعي' : 'Unlimited messages, priority models, and voice interaction'}
+              <p className="text-xs text-[var(--text-muted)] flex items-center gap-2 mt-0.5">
+                <MapPin className="w-3.5 h-3.5 text-indigo-400" />
+                <span>
+                  {locationPermissionStatus === 'granted'
+                    ? `الموقع المحدد: ${userCountryName} ${userCity ? `(${userCity})` : ''}`
+                    : 'الموقع: غير معروف (لم يمنح العميل الإذن للوصول للموقع)'}
+                </span>
               </p>
             </div>
           </div>
@@ -155,6 +287,33 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
             className="p-2 bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] rounded-2xl text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all"
           >
             <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Modal Main Navigation Tabs */}
+        <div className="flex items-center gap-2 border-b border-[var(--border-color)] pb-3">
+          <button
+            onClick={() => setActiveTab('checkout')}
+            className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all ${
+              activeTab === 'checkout'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'bg-[var(--bg-main)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>{isArabic ? 'باقات الاشتراك المتاحة' : 'Available Plans'}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('receipt')}
+            className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all ${
+              activeTab === 'receipt'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'bg-[var(--bg-main)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
+            }`}
+          >
+            <Upload className="w-4 h-4" />
+            <span>{isArabic ? 'إرسال إيصال سداد يدوي' : 'Submit Payment Receipt'}</span>
           </button>
         </div>
 
@@ -175,9 +334,99 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
             <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
             {isArabic ? 'جاري تحميل تفاصيل خطط الاشتراك وطرق الدفع...' : 'Loading subscription plans and payment methods...'}
           </div>
+        ) : activeTab === 'receipt' ? (
+          /* Manual Payment Receipt Submission Form */
+          <form onSubmit={handleReceiptSubmit} className="space-y-4 p-5 rounded-2xl bg-[var(--bg-main)] border border-[var(--border-color)] text-xs">
+            <h3 className="text-sm font-bold text-[var(--text-main)] flex items-center gap-2 text-purple-400">
+              <FileText className="w-4 h-4" />
+              <span>{isArabic ? 'نموذج التحقق وإرسال إيصال التحويل اليدوي' : 'Manual Receipt Verification Form'}</span>
+            </h3>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              {isArabic
+                ? 'إذا قمت بالتحويل البنكي أو السداد عبر المحفظة، يرجى إدخال مرجع التحويل أدناه لمراجعة طلبك وتفعيل الباقة مباشرة.'
+                : 'Enter your transaction reference number for manual admin verification.'}
+            </p>
+
+            {receiptSuccessMsg && (
+              <div className="p-3 bg-purple-950/80 border border-purple-800 text-purple-200 text-xs rounded-xl flex items-center justify-between">
+                <span>{receiptSuccessMsg}</span>
+                <button type="button" onClick={() => setReceiptSuccessMsg(null)} className="text-purple-400 hover:text-white">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[var(--text-muted)] mb-1 font-semibold">اختر الباقة المراد تفعيلها</label>
+                <select
+                  value={receiptPlanId}
+                  onChange={(e) => setReceiptPlanId(e.target.value)}
+                  className="w-full bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl p-2.5 text-[var(--text-main)] focus:outline-none"
+                >
+                  {plans.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} - (${billingCycle === 'monthly' ? p.monthlyPrice : p.yearlyPrice} {p.currency})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[var(--text-muted)] mb-1 font-semibold font-sans">طريقة التحويل / البنك</label>
+                <input
+                  type="text"
+                  required
+                  value={receiptMethodName}
+                  onChange={(e) => setReceiptMethodName(e.target.value)}
+                  placeholder="مثال: تحويل بنك الراجحي / STC Pay"
+                  className="w-full bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl p-2.5 text-[var(--text-main)] focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[var(--text-muted)] mb-1 font-semibold">رقم مرجع الحوالة / Transaction Ref # *</label>
+              <input
+                type="text"
+                required
+                value={receiptRef}
+                onChange={(e) => setReceiptRef(e.target.value)}
+                placeholder="e.g. TXN-893018402"
+                className="w-full bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl p-2.5 text-[var(--text-main)] font-mono focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[var(--text-muted)] mb-1 font-semibold">ملاحظات إضافية / رابط الإيصال</label>
+              <textarea
+                rows={2}
+                value={receiptNote}
+                onChange={(e) => setReceiptNote(e.target.value)}
+                placeholder="أدخل أي ملاحظات أو اسم المحول للإسراع من عملية التأكيد..."
+                className="w-full bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl p-2.5 text-[var(--text-main)] focus:outline-none"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={receiptSubmitting}
+              className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-purple-600/20 flex items-center justify-center gap-2"
+            >
+              {receiptSubmitting ? (
+                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  <span>{isArabic ? 'إرسال إيصال السداد للمراجعة والتأكيد' : 'Submit Receipt for Approval'}</span>
+                </>
+              )}
+            </button>
+          </form>
         ) : (
+          /* Checkout & Plans List View */
           <div className="space-y-6">
-            {/* Current Active Plan & Usage Statistics Card */}
+            {/* Current Active Plan Card */}
             {statusData && (
               <div className="p-4 sm:p-5 rounded-2xl bg-[var(--bg-main)] border border-[var(--border-color)] space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -192,10 +441,6 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
                         {statusData.subscription?.status || statusData.status || 'Active'}
                       </span>
                     </div>
-                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                      {isArabic ? 'فترة الاستخدام الحالية:' : 'Billing Period:'}{' '}
-                      <span className="font-mono text-[var(--text-main)] font-semibold">{statusData.period}</span>
-                    </p>
                   </div>
 
                   {statusData.plan?.id === 'free' && (
@@ -203,67 +448,6 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
                       {isArabic ? 'ترقية متاحة الآن ✨' : 'Upgrade Available ✨'}
                     </span>
                   )}
-                </div>
-
-                {/* Detailed Usage Statistics Grid (Tokens, Points: 1 pt = 5 tokens, Messages, Voice) */}
-                <div className="pt-2 border-t border-[var(--border-color)]">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-black text-[var(--text-main)] flex items-center gap-1.5">
-                      <Zap className="w-4 h-4 text-amber-500" />
-                      <span>{isArabic ? 'إحصائيات الاستهلاك والنقاط' : 'Consumption & Points Stats'}</span>
-                    </span>
-                    <span className="text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-full">
-                      {isArabic ? '1 نقطة = 5 توكن' : '1 Point = 5 Tokens'}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
-                    {/* 1. Tokens Used */}
-                    <div className="p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)]">
-                      <span className="text-[10px] font-bold text-[var(--text-muted)] block">
-                        {isArabic ? 'التوكنات المستخدمة' : 'Tokens Used'}
-                      </span>
-                      <p className="text-base sm:text-lg font-black text-indigo-500 dark:text-indigo-400 mt-1 font-mono">
-                        {(statusData.stats?.tokensUsed ?? 0).toLocaleString()}
-                      </p>
-                    </div>
-
-                    {/* 2. Points (1 point = 5 tokens) */}
-                    <div className="p-3 rounded-xl bg-[var(--bg-surface)] border border-purple-500/30 bg-purple-500/5">
-                      <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 block">
-                        {isArabic ? 'النقاط المستهلكة' : 'Points Used'}
-                      </span>
-                      <p className="text-base sm:text-lg font-black text-purple-600 dark:text-purple-400 mt-1 font-mono">
-                        {(statusData.stats?.pointsUsed ?? Math.floor((statusData.stats?.tokensUsed || 0) / 5)).toLocaleString()}
-                      </p>
-                    </div>
-
-                    {/* 3. Messages Count */}
-                    <div className="p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)]">
-                      <span className="text-[10px] font-bold text-[var(--text-muted)] block">
-                        {isArabic ? 'عدد الرسائل' : 'Messages'}
-                      </span>
-                      <p className="text-base sm:text-lg font-black text-[var(--text-main)] mt-1 font-mono">
-                        {statusData.stats?.messagesCount ?? (statusData.usage?.ai_messages || 0)}
-                        <span className="text-[10px] text-[var(--text-muted)] font-normal">
-                          {' '}/ {statusData.plan?.limits?.ai_messages_per_month ?? 50}
-                        </span>
-                      </p>
-                    </div>
-
-                    {/* 4. Voice Minutes / Seconds */}
-                    <div className="p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)]">
-                      <span className="text-[10px] font-bold text-[var(--text-muted)] block">
-                        {isArabic ? 'دقائق الصوت' : 'Voice Minutes'}
-                      </span>
-                      <p className="text-base sm:text-lg font-black text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
-                        {statusData.stats?.voiceMinutes ?? (statusData.usage?.voice_minutes || 0)}
-                        <span className="text-[10px] text-[var(--text-muted)] font-normal">
-                          {' '}/ {statusData.plan?.limits?.voice_minutes_per_month ?? 15}د
-                        </span>
-                      </p>
-                    </div>
-                  </div>
                 </div>
               </div>
             )}
@@ -303,40 +487,34 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
               </h4>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                {paymentMethods.length > 0 ? (
-                  paymentMethods.map((m) => {
-                    const isSelected = selectedMethodId === m.id;
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => setSelectedMethodId(m.id)}
-                        className={`p-3 rounded-xl border text-xs font-bold flex items-center gap-2 transition-all ${
-                          isSelected
-                            ? 'border-[var(--accent-sage)] bg-[var(--accent-sage)]/15 text-[var(--accent-sage)] ring-1 ring-[var(--accent-sage)] shadow-sm'
-                            : 'border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-main)] hover:bg-[var(--bg-hover)]'
-                        }`}
-                      >
-                        {m.type === 'bank' ? (
-                          <Building2 className="w-4 h-4 text-blue-500 shrink-0" />
-                        ) : m.type === 'wallet' ? (
-                          <Wallet className="w-4 h-4 text-emerald-500 shrink-0" />
-                        ) : (
-                          <CreditCard className="w-4 h-4 text-amber-500 shrink-0" />
-                        )}
-                        <span className="truncate">{m.name}</span>
-                        {isSelected && <Check className="w-3.5 h-3.5 ml-auto shrink-0" />}
-                      </button>
-                    );
-                  })
-                ) : (
-                  <div className="col-span-3 text-center py-2 text-xs text-[var(--text-muted)]">
-                    {isArabic ? 'الدفع الآمن عبر البطاقة الائتمانية' : 'Secure Credit Card Payment'}
-                  </div>
-                )}
+                {paymentMethods.map((m) => {
+                  const isSelected = selectedMethodId === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setSelectedMethodId(m.id)}
+                      className={`p-3 rounded-xl border text-xs font-bold flex items-center gap-2 transition-all ${
+                        isSelected
+                          ? 'border-[var(--accent-sage)] bg-[var(--accent-sage)]/15 text-[var(--accent-sage)] ring-1 ring-[var(--accent-sage)] shadow-sm'
+                          : 'border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-main)] hover:bg-[var(--bg-hover)]'
+                      }`}
+                    >
+                      {m.type === 'bank' ? (
+                        <Building2 className="w-4 h-4 text-blue-500 shrink-0" />
+                      ) : m.type === 'wallet' ? (
+                        <Wallet className="w-4 h-4 text-emerald-500 shrink-0" />
+                      ) : (
+                        <CreditCard className="w-4 h-4 text-amber-500 shrink-0" />
+                      )}
+                      <span className="truncate">{m.name}</span>
+                      {isSelected && <Check className="w-3.5 h-3.5 ml-auto shrink-0" />}
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* Display details for Bank / Wallet methods */}
+              {/* Bank Details View */}
               {selectedMethod && (selectedMethod.type === 'bank' || selectedMethod.type === 'wallet') && (
                 <div className="p-3.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] space-y-2 text-xs animate-fade-in">
                   <div className="flex items-center justify-between font-bold text-[var(--text-main)]">
@@ -355,26 +533,13 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
                       {selectedMethod.instructions}
                     </p>
                   )}
-
-                  <div className="pt-2">
-                    <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase block mb-1">
-                      {isArabic ? 'رقم الحوالة / العملية للتأكيد (اختياري)' : 'Reference / Transaction Number (Optional)'}
-                    </label>
-                    <input
-                      type="text"
-                      value={transferRefNumber}
-                      onChange={(e) => setTransferRefNumber(e.target.value)}
-                      placeholder="e.g. TXN-9482019"
-                      className="w-full px-3 py-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] text-xs text-[var(--text-main)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-sage)]"
-                    />
-                  </div>
                 </div>
               )}
             </div>
 
-            {/* Plans List */}
+            {/* Plans Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {plans.map((p) => {
+              {visiblePlans.map((p) => {
                 const isCurrent = statusData?.plan?.id === p.id;
                 const price = billingCycle === 'monthly' ? p.monthlyPrice : p.yearlyPrice;
                 const cycleText = billingCycle === 'monthly' ? (isArabic ? '/ شهر' : '/ month') : (isArabic ? '/ سنة' : '/ year');
@@ -383,18 +548,18 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
                   <div
                     key={p.id}
                     className={`p-6 rounded-3xl border flex flex-col justify-between transition-all ${
-                      p.id === 'premium'
+                      p.id === 'premium' || p.id === 'pro'
                         ? 'border-[var(--accent-sage)] bg-[var(--accent-sage)]/5 shadow-xl relative overflow-hidden'
                         : 'border-[var(--border-color)] bg-[var(--bg-main)]'
                     }`}
                   >
-                    {p.id === 'premium' && (
+                    {p.badgeText && (
                       <div className="absolute top-0 right-0 left-0 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[10px] font-bold text-center py-1 uppercase tracking-wider">
-                        {isArabic ? 'الخطة الأكثر شعبية 🔥' : 'Most Popular Plan 🔥'}
+                        {p.badgeText}
                       </div>
                     )}
 
-                    <div className={p.id === 'premium' ? 'pt-3' : ''}>
+                    <div className={p.badgeText ? 'pt-3' : ''}>
                       <h3 className="text-lg font-bold text-[var(--text-main)] flex items-center gap-2">
                         {p.id !== 'free' && <Crown className="w-5 h-5 text-amber-500" />}
                         {p.name}
@@ -406,28 +571,29 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
                         <span className="text-xs text-[var(--text-muted)]"> {p.currency} {cycleText}</span>
                       </div>
 
+                      {/* Custom Features List */}
                       <div className="space-y-2 text-xs text-[var(--text-main)] my-4">
                         <p className="text-[11px] font-semibold text-[var(--text-muted)] mb-1">
-                          {isArabic ? 'الميزات والحدود:' : 'Features & Limits:'}
+                          {isArabic ? 'الميزات والحدود المضمنة:' : 'Included Features:'}
                         </p>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                          <span>
-                            <strong>{p.limits?.ai_messages_per_month}</strong> {isArabic ? 'رسالة ذكاء اصطناعي / شهر' : 'AI messages / month'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                          <span>
-                            <strong>{p.limits?.voice_minutes_per_month}</strong> {isArabic ? 'دقيقة محادثة صوتية' : 'minutes voice chat'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                          <span>
-                            {isArabic ? 'تحليل ذكي متعدد (Multi-AI Models)' : 'Multi-Model AI Orchestration'}
-                          </span>
-                        </div>
+                        {(p.featuresList && p.featuresList.length > 0
+                          ? p.featuresList
+                          : [
+                              { text: `${p.limits?.ai_messages_per_month || 100} رسائل ذكاء اصطناعي`, enabled: true },
+                              { text: `${p.limits?.voice_minutes_per_month || 30} دقائق محادثة صوتية`, enabled: true },
+                            ]
+                        ).map((feat: any, idx: number) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            {feat.enabled ? (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                            ) : (
+                              <X className="w-4 h-4 text-slate-500 shrink-0" />
+                            )}
+                            <span className={feat.enabled ? 'text-[var(--text-main)]' : 'text-[var(--text-muted)] line-through'}>
+                              {feat.text}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </div>
 
@@ -437,9 +603,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
                       className={`w-full py-3 rounded-2xl font-bold text-xs transition-all shadow-lg flex items-center justify-center gap-2 ${
                         isCurrent
                           ? 'bg-slate-700 text-slate-400 cursor-default shadow-none'
-                          : p.id === 'premium'
-                          ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-amber-500/20'
-                          : 'bg-[var(--bg-surface)] border border-[var(--border-color)] text-[var(--text-main)] hover:bg-[var(--bg-hover)]'
+                          : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-amber-500/20'
                       }`}
                     >
                       {processingPlanId === p.id ? (
@@ -463,4 +627,3 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, o
     </div>
   );
 };
-

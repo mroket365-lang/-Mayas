@@ -17,6 +17,7 @@ import { PermissionsModal } from './components/PermissionsModal';
 import { SubscriptionModal } from './components/SubscriptionModal';
 import { StatsModal } from './components/StatsModal';
 import { MaritalCounselingModal } from './components/MaritalCounselingModal';
+import { ConsultationsHubModal } from './components/ConsultationsHubModal';
 import { AuthModal } from './components/AuthModal';
 import { DailyCheckInModal } from './components/DailyCheckInModal';
 import { AdminPanel } from './admin/AdminPanel';
@@ -60,6 +61,7 @@ export default function App() {
   const [isSubscriptionOpen, setIsSubscriptionOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isMaritalSupportOpen, setIsMaritalSupportOpen] = useState(false);
+  const [isConsultationsHubOpen, setIsConsultationsHubOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isDailyCheckInOpen, setIsDailyCheckInOpen] = useState(false);
   const [ringingAlarm, setRingingAlarm] = useState<CompanionItem | null>(null);
@@ -698,6 +700,7 @@ export default function App() {
         onOpenSubscription={() => setIsSubscriptionOpen(true)}
         onOpenStats={() => setIsStatsOpen(true)}
         onOpenAuth={() => setIsAuthOpen(true)}
+        onOpenConsultationsHub={() => setIsConsultationsHubOpen(true)}
         systemSettings={systemSettings}
         onOpenMaritalSupport={
           systemSettings?.maritalSupportAllowed !== false
@@ -712,6 +715,7 @@ export default function App() {
             messages={messages}
             profile={profile}
             items={items}
+            onOpenConsultationsHub={() => setIsConsultationsHubOpen(true)}
             onOpenMaritalSupport={
               systemSettings?.maritalSupportAllowed !== false
                 ? () => setIsMaritalSupportOpen(true)
@@ -819,6 +823,10 @@ export default function App() {
           onClose={() => setIsSettingsOpen(false)}
           onClearMemory={handleClearMemory}
           onExportData={handleExportData}
+          onOpenConsultationsHub={() => {
+            setIsSettingsOpen(false);
+            setIsConsultationsHubOpen(true);
+          }}
           onOpenMaritalSupport={
             systemSettings?.maritalSupportAllowed !== false
               ? () => {
@@ -898,6 +906,19 @@ export default function App() {
           onClose={() => setIsMaritalSupportOpen(false)}
           profile={profile}
           onUpdateProfile={handleUpdateProfile}
+        />
+      )}
+
+      {isConsultationsHubOpen && (
+        <ConsultationsHubModal
+          isOpen={isConsultationsHubOpen}
+          onClose={() => setIsConsultationsHubOpen(false)}
+          profile={profile}
+          onUpdateProfile={handleUpdateProfile}
+          onGoToChat={() => {
+            setActiveTab('companion');
+            setIsConsultationsHubOpen(false);
+          }}
         />
       )}
 

@@ -19,6 +19,21 @@ export interface UserEntity {
   profileData?: any;
   messagesData?: any;
   itemsData?: any;
+  country?: string;
+  countryCode?: string;
+  city?: string;
+  region?: string;
+  latitude?: number;
+  longitude?: number;
+  locationStatus?: 'granted' | 'denied' | 'prompt' | 'unknown';
+  locationUpdatedAt?: string;
+}
+
+export interface PlanFeatureItem {
+  text: string;
+  enabled: boolean;
+  highlighted?: boolean;
+  icon?: string;
 }
 
 export interface PlanEntity {
@@ -30,12 +45,41 @@ export interface PlanEntity {
   currency: string;
   active: boolean;
   features: string[];
+  featuresList?: PlanFeatureItem[];
+  icon?: string;
+  badgeText?: string;
+  highlightColor?: string;
+  targetRegions?: string[]; // e.g. ['ALL'] or ['SA', 'AE', 'EG', 'US']
+  unlockedFeatureIds?: string[];
   limits: {
     ai_messages_per_month: number;
     voice_minutes_per_month: number;
     multi_ai_requests_per_month: number;
     advanced_ai_requests_per_month: number;
   };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaymentReceiptEntity {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  planId: string;
+  planName: string;
+  amount: number;
+  currency: string;
+  billingCycle: 'monthly' | 'yearly';
+  paymentMethodId: string;
+  paymentMethodTitle: string;
+  transactionReference: string;
+  receiptImage?: string;
+  notes?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  rejectionReason?: string;
+  approvedAt?: string;
+  approvedBy?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -109,7 +153,10 @@ export interface FeatureFlagConfig {
 
 export type FeatureCategory = 'tabs' | 'actions' | 'chat_tools' | 'saved_tools' | 'preferences' | 'ai_modules';
 export type FeatureAudience = 'everyone' | 'authenticated_only' | 'specific_users' | 'disabled';
-export type FeatureLockedBehavior = 'hide' | 'badge_lock';
+export type FeatureLockedBehavior = 'hide' | 'badge_lock' | 'maintenance' | 'coming_soon' | 'custom_popup';
+export type FeatureDeviceTarget = 'all' | 'mobile_only' | 'desktop_only';
+export type FeatureLanguageTarget = 'all' | 'ar_only' | 'en_only';
+export type FeatureCustomBadge = 'none' | 'new' | 'beta' | 'maintenance' | 'coming_soon' | 'vip' | 'custom';
 
 export interface ProgressiveDisclosureConfig {
   enabled: boolean;
@@ -134,11 +181,17 @@ export interface FeatureRuleConfig {
   icon: string;
   targetAudience: FeatureAudience;
   specificUsers: string[];
-  allowedPlans: string[]; // ['free', 'premium', 'pro'] or ['all']
+  allowedPlans: string[]; // ['all'], ['none'], ['free', 'premium', 'pro'], etc.
+  deviceTarget?: FeatureDeviceTarget;
+  languageTarget?: FeatureLanguageTarget;
+  customBadge?: FeatureCustomBadge;
+  customBadgeText?: string;
   progressiveDisclosure: ProgressiveDisclosureConfig;
   timeWindow: FeatureTimeWindowConfig;
   lockedBehavior: FeatureLockedBehavior;
+  customLockTitle?: string;
   customLockMessage?: string;
+  maintenanceMessage?: string;
   updatedAt?: string;
 }
 
@@ -147,8 +200,24 @@ export interface EvaluatedFeatureStatus {
   enabled: boolean;
   locked: boolean;
   lockedBehavior: FeatureLockedBehavior;
-  reason?: 'disabled' | 'specific_users_only' | 'requires_auth' | 'plan_restricted' | 'progressive_time_locked' | 'progressive_messages_locked' | 'progressive_tasks_locked' | 'outside_time_window' | 'ok';
+  reason?:
+    | 'disabled'
+    | 'specific_users_only'
+    | 'requires_auth'
+    | 'plan_restricted'
+    | 'progressive_time_locked'
+    | 'progressive_messages_locked'
+    | 'progressive_tasks_locked'
+    | 'outside_time_window'
+    | 'device_mismatch'
+    | 'language_mismatch'
+    | 'maintenance'
+    | 'coming_soon'
+    | 'ok';
+  lockTitle?: string;
   lockMessage?: string;
+  customBadge?: FeatureCustomBadge;
+  customBadgeText?: string;
   name: string;
   icon: string;
 }
@@ -197,6 +266,7 @@ export interface DatabaseSchema {
   plans: PlanEntity[];
   subscriptions: SubscriptionEntity[];
   subscriptionHistory: SubscriptionHistoryEntity[];
+  paymentReceipts?: PaymentReceiptEntity[];
   usageRecords: UsageRecordEntity[];
   adminAuditLogs: AdminAuditLogEntity[];
   aiUsageLogs: AIUsageLogEntity[];
@@ -458,6 +528,21 @@ export const defaultFeaturesList: FeatureRuleConfig[] = [
     timeWindow: { enabled: false },
     lockedBehavior: 'hide',
   },
+  {
+    id: 'button_admin_panel',
+    nameAr: 'زر الدخول للوحة التحكم الإدارية (Admin)',
+    nameEn: 'Admin Panel Access Button',
+    descriptionAr: 'التحكم في ظهور أو إخفاء زر الانتقال للوحة التحكم الإدارية في الإعدادات وقائمة الأدوات',
+    descriptionEn: 'Control visibility of the Admin Panel portal trigger in Settings and tools menu',
+    category: 'actions',
+    icon: 'ShieldAlert',
+    targetAudience: 'everyone',
+    specificUsers: [],
+    allowedPlans: ['all'],
+    progressiveDisclosure: { enabled: false, minAccountAgeDays: 0, minMessagesSent: 0, minCompletedTasks: 0 },
+    timeWindow: { enabled: false },
+    lockedBehavior: 'hide',
+  },
 ];
 
 const defaultDatabase: DatabaseSchema = {
@@ -476,13 +561,24 @@ const defaultDatabase: DatabaseSchema = {
   plans: [
     {
       id: 'free',
-      name: 'Free Plan / الخطة المجانية',
-      description: 'Standard AI companion with monthly limits',
+      name: 'الخطة المجانية (Free)',
+      description: 'تجربة القيادة والاستخدام الأساسي للرفيق الذكي',
       monthlyPrice: 0,
       yearlyPrice: 0,
       currency: 'USD',
       active: true,
+      icon: 'Sparkles',
+      badgeText: 'مجاناً للجميع',
+      highlightColor: 'gray',
+      targetRegions: ['ALL'],
       features: ['ai_basic', 'voice'],
+      featuresList: [
+        { text: '50 رسالة ذكاء اصطناعي شهرياً', enabled: true, icon: 'MessageCircle' },
+        { text: '20 دقيقة محادثة صوتية شهرياً', enabled: true, icon: 'Mic' },
+        { text: 'ملاحظات وتذكيرات غير محدودة', enabled: true, icon: 'CheckCircle2' },
+        { text: 'النماذج المتقدمة الذكية (Pro Models)', enabled: false, icon: 'Lock' },
+        { text: 'استجابة فائقة السرعة مع الأولوية', enabled: false, icon: 'Zap' },
+      ],
       limits: {
         ai_messages_per_month: 50,
         voice_minutes_per_month: 20,
@@ -494,13 +590,24 @@ const defaultDatabase: DatabaseSchema = {
     },
     {
       id: 'premium',
-      name: 'Premium Plan / الخطة المتقدمة',
-      description: 'Unlimited AI conversations, Multi-AI orchestration & priority support',
+      name: 'الخطة المتقدمة (Premium)',
+      description: 'محادثات متقدمة مع الرفيق الذكي وبدون حدود يومية',
       monthlyPrice: 9.99,
       yearlyPrice: 89.99,
       currency: 'USD',
       active: true,
+      icon: 'Zap',
+      badgeText: 'الأكثر شعبية ✨',
+      highlightColor: 'indigo',
+      targetRegions: ['ALL'],
       features: ['ai_basic', 'ai_advanced', 'voice', 'multi_ai', 'advanced_memory', 'advanced_reports', 'priority_ai'],
+      featuresList: [
+        { text: '2000 رسالة ذكاء اصطناعي شهرياً', enabled: true, highlighted: true, icon: 'MessageCircle' },
+        { text: '500 دقيقة محادثة صوتية عالية الجودة', enabled: true, highlighted: true, icon: 'Mic' },
+        { text: 'مقارنة النماذج المتعددة (Multi-AI Synthesis)', enabled: true, icon: 'Layers' },
+        { text: 'ذاكرة موسعة ومحرك التحليل الشخصي', enabled: true, icon: 'Brain' },
+        { text: 'استجابة فائقة السرعة وبدون انتظار', enabled: true, icon: 'Zap' },
+      ],
       limits: {
         ai_messages_per_month: 2000,
         voice_minutes_per_month: 500,
@@ -512,13 +619,23 @@ const defaultDatabase: DatabaseSchema = {
     },
     {
       id: 'pro',
-      name: 'Pro Family Plan / الخطة الاحترافية',
-      description: 'Highest capacity for power users with unlimited multi-model synthesis',
+      name: 'الخطة الاحترافية (Pro Super)',
+      description: 'السعة القصوى للمحترفين والأسر ورواد الأعمال',
       monthlyPrice: 24.99,
       yearlyPrice: 229.99,
       currency: 'USD',
       active: true,
+      icon: 'Crown',
+      badgeText: 'سعة كاملة بلا قيود 👑',
+      highlightColor: 'amber',
+      targetRegions: ['ALL'],
       features: ['ai_basic', 'ai_advanced', 'voice', 'multi_ai', 'advanced_memory', 'advanced_reports', 'priority_ai'],
+      featuresList: [
+        { text: '10,000 رسالة ذكاء اصطناعي شهرياً', enabled: true, highlighted: true, icon: 'Sparkles' },
+        { text: '2000 دقيقة صوت تفاعلي وسريع جداً', enabled: true, highlighted: true, icon: 'Volume2' },
+        { text: '1000 طلب نماذج متعددة وذكية جداً', enabled: true, icon: 'Cpu' },
+        { text: 'دعم فني خاص وأولوية المعالجة على السيرفر', enabled: true, icon: 'ShieldCheck' },
+      ],
       limits: {
         ai_messages_per_month: 10000,
         voice_minutes_per_month: 2000,
@@ -719,6 +836,69 @@ class Database {
 
   public getAIUsageLogs(): AIUsageLogEntity[] {
     return this.data.aiUsageLogs;
+  }
+
+  public getPaymentReceipts(): PaymentReceiptEntity[] {
+    if (!this.data.paymentReceipts) {
+      this.data.paymentReceipts = [];
+    }
+    return this.data.paymentReceipts;
+  }
+
+  public addPaymentReceipt(receipt: PaymentReceiptEntity): PaymentReceiptEntity {
+    if (!this.data.paymentReceipts) {
+      this.data.paymentReceipts = [];
+    }
+    this.data.paymentReceipts.unshift(receipt);
+    this.save();
+    return receipt;
+  }
+
+  public updatePaymentReceiptStatus(
+    id: string,
+    status: 'approved' | 'rejected',
+    reason?: string,
+    approvedBy?: string
+  ): PaymentReceiptEntity | undefined {
+    if (!this.data.paymentReceipts) return undefined;
+    const item = this.data.paymentReceipts.find((r) => r.id === id);
+    if (item) {
+      item.status = status;
+      if (reason) item.rejectionReason = reason;
+      if (approvedBy) item.approvedBy = approvedBy;
+      item.approvedAt = new Date().toISOString();
+      item.updatedAt = new Date().toISOString();
+      this.save();
+    }
+    return item;
+  }
+
+  public updateUserLocation(
+    userId: string,
+    loc: {
+      country?: string;
+      countryCode?: string;
+      city?: string;
+      region?: string;
+      latitude?: number;
+      longitude?: number;
+      locationStatus?: 'granted' | 'denied' | 'prompt' | 'unknown';
+    }
+  ): UserEntity | undefined {
+    const u = this.findUserById(userId);
+    if (u) {
+      u.country = loc.country || u.country || 'غير معروف';
+      u.countryCode = loc.countryCode || u.countryCode || 'XX';
+      u.city = loc.city || u.city || 'غير معروف';
+      u.region = loc.region || u.region;
+      if (loc.latitude !== undefined) u.latitude = loc.latitude;
+      if (loc.longitude !== undefined) u.longitude = loc.longitude;
+      u.locationStatus = loc.locationStatus || 'unknown';
+      u.locationUpdatedAt = new Date().toISOString();
+      this.save();
+      return u;
+    }
+    return undefined;
   }
 
   public getSettings(): SystemSettingsEntity {
@@ -936,6 +1116,44 @@ class Database {
       (userId && userId.startsWith('USR-') && userId !== 'user_default_01')
     );
 
+    // 0. Maintenance Mode / Coming Soon explicit locked behavior
+    if (feature.lockedBehavior === 'maintenance') {
+      return {
+        id: feature.id,
+        name: feature.nameAr,
+        icon: feature.icon,
+        enabled: false,
+        locked: true,
+        lockedBehavior: 'maintenance',
+        reason: 'maintenance',
+        lockTitle: feature.customLockTitle || 'الميزة تحت الصيانة والتحسينات 🛠️',
+        lockMessage:
+          feature.maintenanceMessage ||
+          feature.customLockMessage ||
+          'نعمل حالياً على تطوير وتحديث هذه الميزة لتقديم أداء أفضل وتجربة مميزة، وسنعاود إتاحتها فور اكتمال التحديثات. شكراً لتفهمكم وصبركم ✨',
+        customBadge: feature.customBadge || 'maintenance',
+        customBadgeText: feature.customBadgeText,
+      };
+    }
+
+    if (feature.lockedBehavior === 'coming_soon') {
+      return {
+        id: feature.id,
+        name: feature.nameAr,
+        icon: feature.icon,
+        enabled: false,
+        locked: true,
+        lockedBehavior: 'coming_soon',
+        reason: 'coming_soon',
+        lockTitle: feature.customLockTitle || 'قريباً جداً 🚀',
+        lockMessage:
+          feature.customLockMessage ||
+          'ترقبوا إطلاق هذه الميزة قريباً! نعمل على تجهيزها لتمنحكم تجربة استثنائية.',
+        customBadge: feature.customBadge || 'coming_soon',
+        customBadgeText: feature.customBadgeText,
+      };
+    }
+
     // 1. Target Audience Evaluation
     if (feature.targetAudience === 'disabled') {
       return {
@@ -946,7 +1164,10 @@ class Database {
         locked: true,
         lockedBehavior: feature.lockedBehavior,
         reason: 'disabled',
-        lockMessage: 'هذه الميزة معطلة حالياً للصيانة أو التطوير',
+        lockTitle: feature.customLockTitle || 'الميزة معطلة مؤقتاً',
+        lockMessage: feature.customLockMessage || 'هذه الميزة معطلة حالياً للصيانة أو التطوير',
+        customBadge: feature.customBadge,
+        customBadgeText: feature.customBadgeText,
       };
     }
 
@@ -967,7 +1188,10 @@ class Database {
           locked: true,
           lockedBehavior: feature.lockedBehavior,
           reason: 'specific_users_only',
+          lockTitle: feature.customLockTitle || 'ميزة خاصة ومحددة',
           lockMessage: feature.customLockMessage || 'هذه الميزة متاحة فقط لمستخدمين محددين تجريبياً',
+          customBadge: feature.customBadge,
+          customBadgeText: feature.customBadgeText,
         };
       }
     }
@@ -982,14 +1206,19 @@ class Database {
           locked: true,
           lockedBehavior: feature.lockedBehavior,
           reason: 'requires_auth',
+          lockTitle: feature.customLockTitle || 'تسجيل الدخول مطلوب',
           lockMessage: feature.customLockMessage || 'يرجى تسجيل الدخول أو إنشاء حساب للوصول لهذه الميزة',
+          customBadge: feature.customBadge,
+          customBadgeText: feature.customBadgeText,
         };
       }
     }
 
-    // 2. Plan Tier Requirement Evaluation
-    if (feature.allowedPlans && feature.allowedPlans.length > 0 && !feature.allowedPlans.includes('all')) {
-      if (!feature.allowedPlans.includes(planId)) {
+    // 2. Plan Tier Requirement Evaluation (Supports 'none' / hidden from all plans)
+    if (feature.allowedPlans) {
+      const plans = feature.allowedPlans;
+      const isNone = plans.includes('none') || plans.length === 0;
+      if (isNone) {
         return {
           id: feature.id,
           name: feature.nameAr,
@@ -998,7 +1227,29 @@ class Database {
           locked: true,
           lockedBehavior: feature.lockedBehavior,
           reason: 'plan_restricted',
-          lockMessage: feature.customLockMessage || `هذه الميزة تتطلب الاشتراك بإحدى الخطط المتقدمة (${feature.allowedPlans.join(' / ')})`,
+          lockTitle: feature.customLockTitle || 'غير متاحة للباقات',
+          lockMessage:
+            feature.customLockMessage || 'هذه الميزة معطلة حالياً لكافة الباقات والاشتراكات',
+          customBadge: feature.customBadge,
+          customBadgeText: feature.customBadgeText,
+        };
+      }
+
+      if (!plans.includes('all') && !plans.includes(planId)) {
+        return {
+          id: feature.id,
+          name: feature.nameAr,
+          icon: feature.icon,
+          enabled: false,
+          locked: true,
+          lockedBehavior: feature.lockedBehavior,
+          reason: 'plan_restricted',
+          lockTitle: feature.customLockTitle || 'ترقية الخطة مطلوبة ✨',
+          lockMessage:
+            feature.customLockMessage ||
+            `هذه الميزة تتطلب الاشتراك بإحدى الخطط المتقدمة (${plans.join(' / ')})`,
+          customBadge: feature.customBadge,
+          customBadgeText: feature.customBadgeText,
         };
       }
     }

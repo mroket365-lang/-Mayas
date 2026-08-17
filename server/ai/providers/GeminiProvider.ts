@@ -53,6 +53,10 @@ export const geminiToolDeclarations: FunctionDeclaration[] = [
           type: Type.STRING,
           description: 'Priority level: low, medium, or high.',
         },
+        category: {
+          type: Type.STRING,
+          description: 'Task/item category: work, personal, health, finance, education, home, other',
+        },
         repeatRule: {
           type: Type.STRING,
           description: 'Repetition rule: none, daily, weekly, or monthly.',

@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { CompanionItem, ItemType, UserProfile } from '../types';
+import { CompanionItem, ItemType, TaskCategory, UserProfile } from '../types';
 import { getTranslation } from '../locales/translations';
-import { Search, Plus, Trash2, CheckCircle2, Clock, Calendar, Bell, BookmarkCheck, Lightbulb, Repeat, AlertCircle, Edit3, Flame, Target, Feather, Lock } from 'lucide-react';
+import { Search, Plus, Trash2, CheckCircle2, Clock, Calendar, Bell, BookmarkCheck, Lightbulb, Repeat, AlertCircle, Edit3, Flame, Target, Feather, Lock, Tag } from 'lucide-react';
 import { EditItemModal } from './EditItemModal';
 import { TaskItemCard } from './TaskItemCard';
 import { LongNoteModal } from './LongNoteModal';
 import { GoalPlanModal } from './GoalPlanModal';
 import { useFeatureGate } from '../context/FeatureGateContext';
+import { TASK_CATEGORIES, getTaskCategoryConfig } from '../constants/taskCategories';
 
 interface SavedViewProps {
   items: CompanionItem[];
@@ -26,6 +27,7 @@ export const SavedView: React.FC<SavedViewProps> = ({
   const { isFeatureVisible, isFeatureEnabled, triggerLockedPrompt } = useFeatureGate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<ItemType | 'all'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isLongNoteModalOpen, setIsLongNoteModalOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
@@ -34,6 +36,7 @@ export const SavedView: React.FC<SavedViewProps> = ({
   // New item form state
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState<ItemType>('task');
+  const [newCategory, setNewCategory] = useState<TaskCategory>('');
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
   const [newTime, setNewTime] = useState('09:00');
 
@@ -55,10 +58,14 @@ export const SavedView: React.FC<SavedViewProps> = ({
 
   const filteredItems = items.filter((item) => {
     const matchesFilter = selectedFilter === 'all' || item.type === selectedFilter;
+    const matchesCategory =
+      selectedCategory === 'all' ||
+      (selectedCategory === 'uncategorized' ? !item.category : item.category === selectedCategory);
     const matchesSearch =
       item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesFilter && matchesSearch;
+      (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (item.category && item.category.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchesFilter && matchesCategory && matchesSearch;
   });
 
   const handleCreateManual = (e: React.FormEvent) => {
@@ -69,7 +76,8 @@ export const SavedView: React.FC<SavedViewProps> = ({
       id: 'item_' + Date.now(),
       userId: 'user_local',
       type: newType,
-      title: newTitle,
+      title: newTitle.trim(),
+      category: newCategory ? newCategory : undefined,
       status: 'pending',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -79,6 +87,7 @@ export const SavedView: React.FC<SavedViewProps> = ({
 
     onAddItem(newItem);
     setNewTitle('');
+    setNewCategory('');
     setIsAddModalOpen(false);
   };
 
@@ -184,7 +193,7 @@ export const SavedView: React.FC<SavedViewProps> = ({
         />
       </div>
 
-      {/* Filter Chips */}
+      {/* Filter Chips (Item Types) */}
       <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
         {filterTabs.map((tab) => (
           <button
@@ -199,6 +208,43 @@ export const SavedView: React.FC<SavedViewProps> = ({
             {tab.label}
           </button>
         ))}
+      </div>
+
+      {/* Category Filter Chips */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-0.5">
+        <span className="text-[10px] font-bold text-[var(--text-muted)] shrink-0 flex items-center gap-1">
+          <Tag className="w-3 h-3 text-[var(--accent-sage)]" />
+          <span>{isArabic ? 'المجال:' : 'Category:'}</span>
+        </span>
+
+        <button
+          onClick={() => setSelectedCategory('all')}
+          className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all border ${
+            selectedCategory === 'all'
+              ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-200 dark:text-stone-900 shadow-sm'
+              : 'border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
+          }`}
+        >
+          {isArabic ? 'الكل' : 'All'}
+        </button>
+
+        {TASK_CATEGORIES.map((cat) => {
+          const isSelected = selectedCategory === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(isSelected ? 'all' : cat.id)}
+              className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold whitespace-nowrap flex items-center gap-1 transition-all border ${
+                isSelected
+                  ? cat.activeChipClass
+                  : `${cat.bgClass} ${cat.textClass} ${cat.borderClass} hover:opacity-80`
+              }`}
+            >
+              <span>{cat.icon}</span>
+              <span>{isArabic ? cat.nameAr.split(' ')[0] : cat.nameEn.split(' ')[0]}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Cards List */}
@@ -243,51 +289,80 @@ export const SavedView: React.FC<SavedViewProps> = ({
             <h3 className="text-lg font-bold text-[var(--text-main)]">{t.addNewItem}</h3>
 
             <form onSubmit={handleCreateManual} className="space-y-3">
-              <div>
-                <label className="text-xs font-bold text-[var(--text-muted)]">Type</label>
-                <select
-                  value={newType}
-                  onChange={(e) => setNewType(e.target.value as ItemType)}
-                  className="w-full mt-1 px-4 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] text-sm"
-                >
-                  <option value="task">{t.filterTasks}</option>
-                  <option value="appointment">{t.filterAppointments}</option>
-                  <option value="reminder">{t.filterReminders}</option>
-                  <option value="alarm">{t.filterAlarms}</option>
-                  <option value="habit">{t.filterHabits}</option>
-                  <option value="idea">{t.filterIdeas}</option>
-                  <option value="note">{t.filterNotes}</option>
-                </select>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-bold text-[var(--text-muted)]">
+                    {isArabic ? 'النوع' : 'Type'}
+                  </label>
+                  <select
+                    value={newType}
+                    onChange={(e) => setNewType(e.target.value as ItemType)}
+                    className="w-full mt-1 px-3 py-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] text-xs font-semibold"
+                  >
+                    <option value="task">{t.filterTasks}</option>
+                    <option value="appointment">{t.filterAppointments}</option>
+                    <option value="reminder">{t.filterReminders}</option>
+                    <option value="alarm">{t.filterAlarms}</option>
+                    <option value="habit">{t.filterHabits}</option>
+                    <option value="idea">{t.filterIdeas}</option>
+                    <option value="note">{t.filterNotes}</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-[var(--text-muted)]">
+                    {isArabic ? 'التصنيف' : 'Category'}
+                  </label>
+                  <select
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value as TaskCategory)}
+                    className="w-full mt-1 px-3 py-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] text-xs font-semibold"
+                  >
+                    <option value="">{isArabic ? 'بدون تصنيف' : 'None (General)'}</option>
+                    {TASK_CATEGORIES.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.icon} {isArabic ? cat.nameAr : cat.nameEn}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-[var(--text-muted)]">Title</label>
+                <label className="text-xs font-bold text-[var(--text-muted)]">
+                  {isArabic ? 'العنوان' : 'Title'}
+                </label>
                 <input
                   type="text"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full mt-1 px-4 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] text-sm"
+                  className="w-full mt-1 px-4 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[var(--accent-sage)]"
+                  placeholder={isArabic ? 'اكتب عنوان المهمة أو الموعد...' : 'Enter title...'}
                   required
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-bold text-[var(--text-muted)]">Date</label>
+                  <label className="text-xs font-bold text-[var(--text-muted)]">
+                    {isArabic ? 'التاريخ' : 'Date'}
+                  </label>
                   <input
                     type="date"
                     value={newDate}
                     onChange={(e) => setNewDate(e.target.value)}
-                    className="w-full mt-1 px-3 py-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] text-sm"
+                    className="w-full mt-1 px-3 py-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] text-xs font-semibold"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-[var(--text-muted)]">Time</label>
+                  <label className="text-xs font-bold text-[var(--text-muted)]">
+                    {isArabic ? 'الوقت' : 'Time'}
+                  </label>
                   <input
                     type="time"
                     value={newTime}
                     onChange={(e) => setNewTime(e.target.value)}
-                    className="w-full mt-1 px-3 py-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] text-sm"
+                    className="w-full mt-1 px-3 py-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] text-xs font-semibold"
                   />
                 </div>
               </div>
@@ -295,16 +370,16 @@ export const SavedView: React.FC<SavedViewProps> = ({
               <div className="flex gap-2 pt-2">
                 <button
                   type="submit"
-                  className="flex-1 py-3 rounded-2xl bg-[var(--accent-sage)] text-white font-bold text-sm"
+                  className="flex-1 py-3 rounded-2xl bg-[var(--accent-sage)] text-white font-bold text-sm shadow-md hover:opacity-90 transition-opacity"
                 >
-                  Save
+                  {isArabic ? 'حفظ العنصر' : 'Save'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-3 rounded-2xl border border-[var(--border-color)] text-[var(--text-muted)] font-semibold text-sm"
+                  className="px-4 py-3 rounded-2xl border border-[var(--border-color)] text-[var(--text-muted)] font-semibold text-sm hover:bg-[var(--bg-hover)]"
                 >
-                  Cancel
+                  {isArabic ? 'إلغاء' : 'Cancel'}
                 </button>
               </div>
             </form>

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { CompanionItem, ItemType, SubTask, UserProfile } from '../types';
+import { CompanionItem, ItemType, SubTask, TaskCategory, UserProfile } from '../types';
 import { X, Calendar, Clock, Type, Tag, Bell, Check, Edit3, ListCheck, Plus, Trash2, Sparkles, Loader2 } from 'lucide-react';
 import { getTranslation } from '../locales/translations';
+import { TASK_CATEGORIES, getTaskCategoryConfig } from '../constants/taskCategories';
 
 type PriorityLevel = NonNullable<CompanionItem['priority']>;
 type RepeatRule = NonNullable<CompanionItem['repeatRule']>;
@@ -29,6 +30,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
   const [title, setTitle] = useState(item.title);
   const [description, setDescription] = useState(item.description || '');
   const [type, setType] = useState<ItemType>(item.type);
+  const [category, setCategory] = useState<TaskCategory>(item.category || '');
   const [dueDate, setDueDate] = useState(item.dueDate || new Date().toISOString().split('T')[0]);
   const [dueTime, setDueTime] = useState(item.dueTime || '09:00');
   const [priority, setPriority] = useState<PriorityLevel>(item.priority || 'medium');
@@ -100,6 +102,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
       title: title.trim(),
       description: description.trim() || undefined,
       type,
+      category: category ? category : undefined,
       dueDate,
       dueTime,
       priority,
@@ -127,7 +130,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                 {isArabic ? 'تعديل العنصر' : 'Edit Item'}
               </h3>
               <p className="text-[11px] text-[var(--text-muted)]">
-                {isArabic ? 'تحديث النص، التاريخ، الوقت، والتفاصيل' : 'Update text, date, time, and settings'}
+                {isArabic ? 'تحديث النص، التصنيف، التاريخ، الوقت، والتفاصيل' : 'Update text, category, date, time, and settings'}
               </p>
             </div>
           </div>
@@ -158,25 +161,86 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
             </div>
           </div>
 
-          {/* Type Select */}
-          <div>
-            <label className="block font-extrabold text-[var(--text-muted)] mb-1">
-              {isArabic ? 'النوع' : 'Category Type'}
+          {/* Type & Category Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Type Select */}
+            <div>
+              <label className="block font-extrabold text-[var(--text-muted)] mb-1">
+                {isArabic ? 'نوع العنصر' : 'Item Type'}
+              </label>
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value as ItemType)}
+                className="w-full px-3 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] font-semibold text-xs"
+              >
+                <option value="task">{t.filterTasks}</option>
+                <option value="appointment">{t.filterAppointments}</option>
+                <option value="reminder">{t.filterReminders}</option>
+                <option value="alarm">{t.filterAlarms}</option>
+                <option value="habit">{t.filterHabits}</option>
+                <option value="idea">{t.filterIdeas}</option>
+                <option value="note">{t.filterNotes}</option>
+                <option value="memory">{t.filterMemories}</option>
+              </select>
+            </div>
+
+            {/* Task Category Picker */}
+            <div>
+              <label className="block font-extrabold text-[var(--text-muted)] mb-1 flex items-center gap-1">
+                <Tag className="w-3.5 h-3.5 text-[var(--accent-sage)]" />
+                <span>{isArabic ? 'التصنيف والمجال' : 'Category'}</span>
+              </label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value as TaskCategory)}
+                className="w-full px-3 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] font-semibold text-xs"
+              >
+                <option value="">{isArabic ? 'بدون تصنيف محدد' : 'No Category (General)'}</option>
+                {TASK_CATEGORIES.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.icon} {isArabic ? cat.nameAr : cat.nameEn}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Quick Category Chips Preview */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold text-[var(--text-muted)]">
+              {isArabic ? 'اختيار سريع للتصنيف:' : 'Quick category badge:'}
             </label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value as ItemType)}
-              className="w-full px-4 py-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] font-semibold text-xs"
-            >
-              <option value="task">{t.filterTasks}</option>
-              <option value="appointment">{t.filterAppointments}</option>
-              <option value="reminder">{t.filterReminders}</option>
-              <option value="alarm">{t.filterAlarms}</option>
-              <option value="habit">{t.filterHabits}</option>
-              <option value="idea">{t.filterIdeas}</option>
-              <option value="note">{t.filterNotes}</option>
-              <option value="memory">{t.filterMemories}</option>
-            </select>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setCategory('')}
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border transition-all ${
+                  !category
+                    ? 'bg-stone-700 text-white border-stone-700 shadow-sm'
+                    : 'bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-color)] hover:bg-[var(--bg-hover)]'
+                }`}
+              >
+                {isArabic ? 'الكل / عام' : 'None'}
+              </button>
+              {TASK_CATEGORIES.map((cat) => {
+                const isSelected = category === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setCategory(cat.id)}
+                    className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border flex items-center gap-1 transition-all ${
+                      isSelected
+                        ? cat.activeChipClass
+                        : `${cat.bgClass} ${cat.textClass} ${cat.borderClass} hover:opacity-80`
+                    }`}
+                  >
+                    <span>{cat.icon}</span>
+                    <span>{isArabic ? cat.nameAr.split(' ')[0] : cat.nameEn.split(' ')[0]}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Habit Icon Picker */}

@@ -53,6 +53,16 @@ export interface GoalAIAnalysis {
   analyzedAt: string;
 }
 
+export type TaskCategory = 
+  | 'work' 
+  | 'personal' 
+  | 'health' 
+  | 'finance' 
+  | 'education' 
+  | 'home' 
+  | 'other' 
+  | string;
+
 export interface CompanionItem {
   id: string;
   userId: string;
@@ -73,7 +83,7 @@ export interface CompanionItem {
   bestStreak?: number;
   completedDates?: string[];
   icon?: string;
-  category?: string;
+  category?: TaskCategory;
   memoryKey?: string;
   snoozedUntil?: string;
   completedAt?: string;
@@ -120,6 +130,34 @@ export type AppLanguage = 'ar' | 'en' | 'zh' | 'hi' | 'ja' | 'de' | 'tr' | 'fr';
 
 export type CompanionGender = 'male' | 'female' | 'unspecified';
 
+export type ConsultationType =
+  | 'none'
+  | 'financial'
+  | 'family'
+  | 'religious'
+  | 'political'
+  | 'psychological'
+  | 'marital';
+
+export interface ConsultationConfig {
+  id: ConsultationType;
+  featureId: string;
+  nameAr: string;
+  nameEn: string;
+  categoryNameAr: string;
+  categoryNameEn: string;
+  descAr: string;
+  descEn: string;
+  iconName: string;
+  colorClass: string;
+  badgeBg: string;
+  badgeText: string;
+  glowColor: string;
+  ageRestricted?: boolean;
+  systemPromptDirectiveAr: string;
+  systemPromptDirectiveEn: string;
+}
+
 export interface UserProfile {
   id?: string;
   accountId?: string;
@@ -144,10 +182,76 @@ export interface UserProfile {
   specialCounselingVerified18?: boolean;
   specialCounselingExpiresAt?: string;
   specialCounselingLastActivatedDate?: string;
+  activeConsultationType?: ConsultationType;
+  activeConsultationExpiresAt?: string;
+  activeConsultationActivatedAt?: string;
   dailyCheckInEnabled?: boolean;
   dailyCheckInTime?: string; // HH:mm (e.g. "20:00")
   lastDailyCheckInDate?: string; // YYYY-MM-DD
   checkInStreak?: number;
+  country?: string;
+  countryCode?: string;
+  city?: string;
+  region?: string;
+  latitude?: number;
+  longitude?: number;
+  locationStatus?: 'granted' | 'denied' | 'prompt' | 'unknown';
+  locationUpdatedAt?: string;
+}
+
+export interface PlanFeatureItem {
+  text: string;
+  enabled: boolean;
+  highlighted?: boolean;
+  icon?: string;
+}
+
+export interface PlanItemConfig {
+  id: string;
+  name: string;
+  description: string;
+  monthlyPrice: number;
+  yearlyPrice: number;
+  currency: string;
+  active: boolean;
+  features: string[];
+  featuresList?: PlanFeatureItem[];
+  icon?: string;
+  badgeText?: string;
+  highlightColor?: string;
+  targetRegions?: string[]; // e.g. ['all'] or ['SA', 'AE', 'EG', 'US', etc.]
+  unlockedFeatureIds?: string[];
+  limits: {
+    ai_messages_per_month: number;
+    voice_minutes_per_month: number;
+    multi_ai_requests_per_month: number;
+    advanced_ai_requests_per_month: number;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PaymentReceiptRequest {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  planId: string;
+  planName: string;
+  amount: number;
+  currency: string;
+  billingCycle: 'monthly' | 'yearly';
+  paymentMethodId: string;
+  paymentMethodTitle: string;
+  transactionReference: string;
+  receiptImage?: string; // Base64 data URL for transfer receipt screenshot
+  notes?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  rejectionReason?: string;
+  approvedAt?: string;
+  approvedBy?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type MoodType = 'great' | 'good' | 'neutral' | 'tired' | 'stressed' | 'sad';
@@ -182,7 +286,10 @@ export interface FeatureFlagConfig {
 
 export type FeatureCategory = 'tabs' | 'actions' | 'chat_tools' | 'saved_tools' | 'preferences' | 'ai_modules';
 export type FeatureAudience = 'everyone' | 'authenticated_only' | 'specific_users' | 'disabled';
-export type FeatureLockedBehavior = 'hide' | 'badge_lock';
+export type FeatureLockedBehavior = 'hide' | 'badge_lock' | 'maintenance' | 'coming_soon' | 'custom_popup';
+export type FeatureDeviceTarget = 'all' | 'mobile_only' | 'desktop_only';
+export type FeatureLanguageTarget = 'all' | 'ar_only' | 'en_only';
+export type FeatureCustomBadge = 'none' | 'new' | 'beta' | 'maintenance' | 'coming_soon' | 'vip' | 'custom';
 
 export interface ProgressiveDisclosureConfig {
   enabled: boolean;
@@ -207,11 +314,17 @@ export interface FeatureRuleConfig {
   icon: string;
   targetAudience: FeatureAudience;
   specificUsers: string[];
-  allowedPlans: string[]; // ['free', 'premium', 'pro'] or ['all']
+  allowedPlans: string[]; // ['all'], ['none'], ['free', 'premium', 'pro'], etc.
+  deviceTarget?: FeatureDeviceTarget;
+  languageTarget?: FeatureLanguageTarget;
+  customBadge?: FeatureCustomBadge;
+  customBadgeText?: string;
   progressiveDisclosure: ProgressiveDisclosureConfig;
   timeWindow: FeatureTimeWindowConfig;
   lockedBehavior: FeatureLockedBehavior;
+  customLockTitle?: string;
   customLockMessage?: string;
+  maintenanceMessage?: string;
   updatedAt?: string;
 }
 
@@ -220,8 +333,24 @@ export interface EvaluatedFeatureStatus {
   enabled: boolean;
   locked: boolean;
   lockedBehavior: FeatureLockedBehavior;
-  reason?: 'disabled' | 'specific_users_only' | 'requires_auth' | 'plan_restricted' | 'progressive_time_locked' | 'progressive_messages_locked' | 'progressive_tasks_locked' | 'outside_time_window' | 'ok';
+  reason?:
+    | 'disabled'
+    | 'specific_users_only'
+    | 'requires_auth'
+    | 'plan_restricted'
+    | 'progressive_time_locked'
+    | 'progressive_messages_locked'
+    | 'progressive_tasks_locked'
+    | 'outside_time_window'
+    | 'device_mismatch'
+    | 'language_mismatch'
+    | 'maintenance'
+    | 'coming_soon'
+    | 'ok';
+  lockTitle?: string;
   lockMessage?: string;
+  customBadge?: FeatureCustomBadge;
+  customBadgeText?: string;
   name: string;
   icon: string;
 }

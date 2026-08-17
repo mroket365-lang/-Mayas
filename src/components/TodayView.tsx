@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CompanionItem, UserProfile, TaskStatus } from '../types';
+import { CompanionItem, UserProfile, TaskStatus, TaskCategory } from '../types';
 import { getTranslation } from '../locales/translations';
 import {
   Calendar,
@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   ListTodo,
   BarChart3,
+  Tag,
 } from 'lucide-react';
 import { EditItemModal } from './EditItemModal';
 import { StatsModal } from './StatsModal';
@@ -28,6 +29,7 @@ import {
   getLocalDateStr,
 } from '../utils/habitUtils';
 import { useFeatureGate } from '../context/FeatureGateContext';
+import { TASK_CATEGORIES, getTaskCategoryConfig } from '../constants/taskCategories';
 
 interface TodayViewProps {
   items: CompanionItem[];
@@ -41,11 +43,11 @@ interface TodayViewProps {
 }
 
 const DEFAULT_HABIT_TEMPLATES = [
-  { title: 'تأمل ورواق صباحي', icon: '🧘', time: '08:00', type: 'habit' as const },
-  { title: 'شرب 2 لتر ماء', icon: '💧', time: '09:00', type: 'habit' as const },
-  { title: 'قراءة 15 دقيقة', icon: '📖', time: '20:00', type: 'habit' as const },
-  { title: 'تمارين رياضية ومشي', icon: '🏃', time: '17:00', type: 'habit' as const },
-  { title: 'تناول الفيتامينات', icon: '💊', time: '09:30', type: 'habit' as const },
+  { title: 'تأمل ورواق صباحي', icon: '🧘', time: '08:00', type: 'habit' as const, category: 'personal' },
+  { title: 'شرب 2 لتر ماء', icon: '💧', time: '09:00', type: 'habit' as const, category: 'health' },
+  { title: 'قراءة 15 دقيقة', icon: '📖', time: '20:00', type: 'habit' as const, category: 'education' },
+  { title: 'تمارين رياضية ومشي', icon: '🏃', time: '17:00', type: 'habit' as const, category: 'health' },
+  { title: 'تناول الفيتامينات', icon: '💊', time: '09:30', type: 'habit' as const, category: 'health' },
 ];
 
 export const TodayView: React.FC<TodayViewProps> = ({
@@ -68,6 +70,7 @@ export const TodayView: React.FC<TodayViewProps> = ({
   const [newHabitTitle, setNewHabitTitle] = useState('');
   const [newHabitIcon, setNewHabitIcon] = useState('🔥');
   const [newHabitTime, setNewHabitTime] = useState('08:00');
+  const [newHabitCategory, setNewHabitCategory] = useState<TaskCategory>('health');
 
   const toggleHabitExpand = (id: string) => {
     setExpandedHabitIds((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -122,6 +125,7 @@ export const TodayView: React.FC<TodayViewProps> = ({
       userId: 'user_local',
       type: 'habit',
       title: newHabitTitle.trim(),
+      category: newHabitCategory ? newHabitCategory : undefined,
       status: 'pending',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -145,6 +149,7 @@ export const TodayView: React.FC<TodayViewProps> = ({
       userId: 'user_local',
       type: 'habit',
       title: isArabic ? template.title : template.title,
+      category: template.category,
       status: 'pending',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -337,7 +342,7 @@ export const TodayView: React.FC<TodayViewProps> = ({
                       onClick={() => toggleHabitExpand(item.id)}
                       className="flex-1 min-w-0 cursor-pointer select-none space-y-0.5"
                     >
-                      <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                         <span className="text-xs shrink-0">{item.icon || '🔥'}</span>
                         <h4
                           className={`text-sm sm:text-base font-bold text-[var(--text-main)] truncate ${
@@ -346,6 +351,20 @@ export const TodayView: React.FC<TodayViewProps> = ({
                         >
                           {item.title}
                         </h4>
+
+                        {(() => {
+                          const catConf = getTaskCategoryConfig(item.category, isArabic);
+                          if (!catConf) return null;
+                          return (
+                            <span
+                              className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-extrabold border shrink-0 ${catConf.badgeClass}`}
+                            >
+                              <span className={`w-1 h-1 rounded-full ${catConf.dotClass}`} />
+                              <span>{catConf.icon}</span>
+                              <span>{isArabic ? catConf.nameAr.split(' ')[0] : catConf.nameEn.split(' ')[0]}</span>
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 text-[11px] text-[var(--text-muted)] font-medium">
@@ -588,6 +607,33 @@ export const TodayView: React.FC<TodayViewProps> = ({
                       {ic}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="font-extrabold text-[var(--text-muted)] mb-1 flex items-center gap-1">
+                  <Tag className="w-3.5 h-3.5 text-[var(--accent-sage)]" />
+                  <span>{isArabic ? 'تصنيف العادة' : 'Habit Category'}</span>
+                </label>
+                <div className="flex flex-wrap gap-1.5 p-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)]">
+                  {TASK_CATEGORIES.map((cat) => {
+                    const isSelected = newHabitCategory === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setNewHabitCategory(cat.id)}
+                        className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border flex items-center gap-1 transition-all ${
+                          isSelected
+                            ? cat.activeChipClass
+                            : `${cat.bgClass} ${cat.textClass} ${cat.borderClass} hover:opacity-80`
+                        }`}
+                      >
+                        <span>{cat.icon}</span>
+                        <span>{isArabic ? cat.nameAr.split(' ')[0] : cat.nameEn.split(' ')[0]}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

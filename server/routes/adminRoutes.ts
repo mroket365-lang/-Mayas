@@ -167,13 +167,44 @@ const getDashboardStats = (req: Request, res: Response) => {
 adminRouter.get('/dashboard/stats', requireAdminAuth, getDashboardStats);
 adminRouter.get('/stats', requireAdminAuth, getDashboardStats);
 
-// 4. Users List (Paginated & Searchable)
-adminRouter.get('/users', requireAdminAuth, (req: Request, res: Response) => {
-  const { search = '', plan = '', status = '', page = '1', limit = '10' } = req.query;
+// Helper to check if a user is a non-logged-in guest account
+function isGuestUser(u: UserEntity): boolean {
+  if (!u.email || u.email.trim() === '') return true;
+  const emailLower = u.email.toLowerCase().trim();
+  if (
+    emailLower.startsWith('guest_') ||
+    emailLower.startsWith('anonymous_') ||
+    emailLower.startsWith('temp_') ||
+    emailLower.endsWith('@guest.local') ||
+    emailLower.endsWith('@example.com') ||
+    u.id === 'user_default_01' ||
+    !emailLower.includes('@')
+  ) {
+    return true;
+  }
+  return false;
+}
 
-  let users = db.getUsers();
+// 4. Users List (Paginated & Searchable with Guest Separation)
+adminRouter.get('/users', requireAdminAuth, (req: Request, res: Response) => {
+  const { search = '', plan = '', status = '', userType = 'all', page = '1', limit = '10' } = req.query;
+
+  let allUsers = db.getUsers();
   const subscriptions = db.getSubscriptions();
   const plans = db.getPlans();
+
+  // Calculate global counts before pagination/filtering
+  const registeredCount = allUsers.filter((u) => !isGuestUser(u)).length;
+  const guestCount = allUsers.filter((u) => isGuestUser(u)).length;
+
+  let users = [...allUsers];
+
+  // User type filter ('registered' vs 'guest' vs 'all')
+  if (userType === 'registered') {
+    users = users.filter((u) => !isGuestUser(u));
+  } else if (userType === 'guest') {
+    users = users.filter((u) => isGuestUser(u));
+  }
 
   // Search filter
   if (search) {
@@ -205,12 +236,15 @@ adminRouter.get('/users', requireAdminAuth, (req: Request, res: Response) => {
   const formatted = paginatedUsers.map((u) => {
     const sub = subscriptions.find((s) => s.userId === u.id);
     const planObj = plans.find((p) => p.id === (sub && sub.status === 'active' ? sub.planId : 'free'));
+    const isGuest = isGuestUser(u);
+
     return {
       id: u.id,
       name: u.name,
       email: u.email,
       role: u.role,
       status: u.status,
+      isGuest,
       createdAt: u.createdAt,
       lastActiveAt: u.lastActiveAt,
       subscription: sub
@@ -233,6 +267,8 @@ adminRouter.get('/users', requireAdminAuth, (req: Request, res: Response) => {
   return res.json({
     users: formatted,
     totalCount,
+    registeredCount,
+    guestCount,
     page: pageNum,
     totalPages,
   });
@@ -380,6 +416,12 @@ adminRouter.post('/plans', requireAdminAuth, requireSuperAdmin, (req: Request, r
     yearlyPrice: Number(yearlyPrice) || 0,
     currency,
     active: true,
+    icon: req.body.icon || 'Sparkles',
+    badgeText: req.body.badgeText || '',
+    highlightColor: req.body.highlightColor || 'indigo',
+    targetRegions: Array.isArray(req.body.targetRegions) ? req.body.targetRegions : ['ALL'],
+    featuresList: Array.isArray(req.body.featuresList) ? req.body.featuresList : [],
+    unlockedFeatureIds: Array.isArray(req.body.unlockedFeatureIds) ? req.body.unlockedFeatureIds : [],
     features: Array.isArray(features) ? features : ['ai_basic'],
     limits: limits || {
       ai_messages_per_month: 100,
@@ -414,7 +456,22 @@ adminRouter.put('/plans/:id', requireAdminAuth, requireSuperAdmin, (req: Request
     return res.status(404).json({ error: 'Plan not found' });
   }
 
-  const { name, description, monthlyPrice, yearlyPrice, currency, active, features, limits } = req.body;
+  const {
+    name,
+    description,
+    monthlyPrice,
+    yearlyPrice,
+    currency,
+    active,
+    features,
+    featuresList,
+    icon,
+    badgeText,
+    highlightColor,
+    targetRegions,
+    unlockedFeatureIds,
+    limits,
+  } = req.body;
 
   const updatedPlan: PlanEntity = {
     ...plan,
@@ -424,6 +481,12 @@ adminRouter.put('/plans/:id', requireAdminAuth, requireSuperAdmin, (req: Request
     yearlyPrice: yearlyPrice !== undefined ? Number(yearlyPrice) : plan.yearlyPrice,
     currency: currency || plan.currency,
     active: active !== undefined ? Boolean(active) : plan.active,
+    icon: icon !== undefined ? icon : plan.icon,
+    badgeText: badgeText !== undefined ? badgeText : plan.badgeText,
+    highlightColor: highlightColor !== undefined ? highlightColor : plan.highlightColor,
+    targetRegions: Array.isArray(targetRegions) ? targetRegions : plan.targetRegions,
+    featuresList: Array.isArray(featuresList) ? featuresList : plan.featuresList,
+    unlockedFeatureIds: Array.isArray(unlockedFeatureIds) ? unlockedFeatureIds : plan.unlockedFeatureIds,
     features: Array.isArray(features) ? features : plan.features,
     limits: limits ? { ...plan.limits, ...limits } : plan.limits,
     updatedAt: new Date().toISOString(),
@@ -435,12 +498,76 @@ adminRouter.put('/plans/:id', requireAdminAuth, requireSuperAdmin, (req: Request
     adminId: session.adminId,
     adminEmail: session.email,
     action: 'UPDATE_PLAN',
-    details: `Updated plan '${planId}' configuration and limits.`,
+    details: `Updated plan '${planId}' configuration, regions, and features.`,
   });
 
   realtimeSyncService.broadcast('plans_updated', { plan: updatedPlan });
 
   return res.json(updatedPlan);
+});
+
+// Admin Receipts / Payment Requests
+adminRouter.get('/receipts', requireAdminAuth, (req: Request, res: Response) => {
+  const receipts = db.getPaymentReceipts();
+  return res.json(receipts);
+});
+
+adminRouter.post('/receipts/:id/status', requireAdminAuth, (req: Request, res: Response) => {
+  const receiptId = req.params.id;
+  const { status, rejectionReason } = req.body;
+  const session = (req as any).adminSession;
+
+  if (status !== 'approved' && status !== 'rejected') {
+    return res.status(400).json({ error: 'Status must be approved or rejected' });
+  }
+
+  const receipt = db.updatePaymentReceiptStatus(receiptId, status, rejectionReason, session.email);
+  if (!receipt) {
+    return res.status(404).json({ error: 'Receipt request not found' });
+  }
+
+  // If approved, automatically activate subscription for the user
+  if (status === 'approved') {
+    const daysToAdd = receipt.billingCycle === 'yearly' ? 365 : 30;
+    const startDate = new Date();
+    const endDate = new Date(startDate.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+
+    const sub = db.upsertSubscription({
+      id: 'sub_' + Math.random().toString(36).substring(2, 9),
+      userId: receipt.userId,
+      planId: receipt.planId,
+      status: 'active',
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      autoRenew: true,
+      paymentProvider: 'manual',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    db.addSubscriptionHistory({
+      userId: receipt.userId,
+      subscriptionId: sub.id,
+      planId: receipt.planId,
+      action: 'APPROVED_MANUAL_RECEIPT',
+      status: 'active',
+      details: `Approved receipt '${receipt.transactionReference}' for plan '${receipt.planName}' by ${session.email}`,
+      performedBy: session.email,
+    });
+
+    realtimeSyncService.broadcast('subscription_updated', { userId: receipt.userId, planId: receipt.planId, status: 'active' });
+  }
+
+  db.addAuditLog({
+    adminId: session.adminId,
+    adminEmail: session.email,
+    action: status === 'approved' ? 'APPROVE_PAYMENT_RECEIPT' : 'REJECT_PAYMENT_RECEIPT',
+    details: `${status.toUpperCase()} payment receipt (${receipt.transactionReference}) for user ${receipt.userEmail}.`,
+  });
+
+  realtimeSyncService.broadcast('receipts_updated', receipt);
+
+  return res.json({ success: true, receipt });
 });
 
 // 8. Subscriptions List
@@ -789,10 +916,16 @@ adminRouter.put('/features/:id', requireAdminAuth, (req: Request, res: Response)
     targetAudience,
     specificUsers,
     allowedPlans,
+    deviceTarget,
+    languageTarget,
+    customBadge,
+    customBadgeText,
     progressiveDisclosure,
     timeWindow,
     lockedBehavior,
+    customLockTitle,
     customLockMessage,
+    maintenanceMessage,
   } = req.body;
 
   const updatedFeature = {
@@ -808,6 +941,10 @@ adminRouter.put('/features/:id', requireAdminAuth, (req: Request, res: Response)
       ? specificUsers.map((s: string) => s.trim().toLowerCase()).filter(Boolean)
       : existing.specificUsers,
     allowedPlans: Array.isArray(allowedPlans) ? allowedPlans : existing.allowedPlans,
+    deviceTarget: deviceTarget || existing.deviceTarget || 'all',
+    languageTarget: languageTarget || existing.languageTarget || 'all',
+    customBadge: customBadge || existing.customBadge || 'none',
+    customBadgeText: customBadgeText !== undefined ? customBadgeText.trim() : existing.customBadgeText,
     progressiveDisclosure: progressiveDisclosure
       ? {
           enabled: Boolean(progressiveDisclosure.enabled),
@@ -824,7 +961,9 @@ adminRouter.put('/features/:id', requireAdminAuth, (req: Request, res: Response)
         }
       : existing.timeWindow,
     lockedBehavior: lockedBehavior || existing.lockedBehavior,
+    customLockTitle: customLockTitle !== undefined ? customLockTitle.trim() : existing.customLockTitle,
     customLockMessage: customLockMessage !== undefined ? customLockMessage.trim() : existing.customLockMessage,
+    maintenanceMessage: maintenanceMessage !== undefined ? maintenanceMessage.trim() : existing.maintenanceMessage,
     updatedAt: new Date().toISOString(),
   };
 

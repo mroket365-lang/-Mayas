@@ -65,6 +65,7 @@ export function validateAndExecuteActions(
         person: args.person || undefined,
         priority: (args.priority as CompanionItem['priority']) || 'medium',
         repeatRule: (args.repeatRule as CompanionItem['repeatRule']) || 'none',
+        category: args.category || undefined,
         subtasks: parsedSubtasks.length > 0 ? parsedSubtasks : undefined,
         progressPercent: args.targetValue && args.targetValue > 0 ? 0 : 0,
         // Long notes & Goal fields

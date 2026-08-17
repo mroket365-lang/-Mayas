@@ -32,11 +32,29 @@ import {
   AlertCircle,
   HelpCircle,
   Smartphone,
+  Laptop,
   Eye,
   EyeOff,
   Filter,
+  TrendingUp,
+  BookOpen,
+  Compass,
+  Maximize2,
+  ShieldAlert,
+  Wrench,
+  Rocket,
+  Tag,
+  Languages,
 } from 'lucide-react';
-import { FeatureRuleConfig, FeatureCategory, FeatureAudience, FeatureLockedBehavior } from '../types';
+import {
+  FeatureRuleConfig,
+  FeatureCategory,
+  FeatureAudience,
+  FeatureLockedBehavior,
+  FeatureDeviceTarget,
+  FeatureLanguageTarget,
+  FeatureCustomBadge,
+} from '../types';
 
 interface AdminFeaturesViewProps {
   token: string;
@@ -58,6 +76,42 @@ const audienceLabels: Record<FeatureAudience, { label: string; color: string; ic
   disabled: { label: 'معطلة كلياً', color: 'bg-rose-500/20 text-rose-300 border-rose-500/30', icon: Ban },
 };
 
+const lockedBehaviorLabels: Record<
+  FeatureLockedBehavior,
+  { label: string; desc: string; icon: any; color: string }
+> = {
+  hide: {
+    label: 'إخفاء تام من الواجهة 🙈',
+    desc: 'العنصر يختفي تماماً ولا يظهر في أي مكان',
+    icon: EyeOff,
+    color: 'bg-slate-800 text-slate-300 border-slate-700',
+  },
+  badge_lock: {
+    label: 'شارة قفل وترقية 👑',
+    desc: 'يظهر الزر وعليه رمز القفل ويطلب ترقية الخطة',
+    icon: Lock,
+    color: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+  },
+  maintenance: {
+    label: 'وضع الصيانة والتحسينات 🛠️',
+    desc: 'يقفل الزر وعند الضغط يعرض رسالة توضيحية بأعمال الصيانة والتحديث',
+    icon: Wrench,
+    color: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+  },
+  coming_soon: {
+    label: 'قريباً جداً 🚀',
+    desc: 'يظهر كزر قادم قريباً مع نافذة تشويقية للمستخدمين',
+    icon: Rocket,
+    color: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+  },
+  custom_popup: {
+    label: 'نافذة تنبيه مخصصة 📋',
+    desc: 'إظهار نافذة منبثقة بتصميم وعنوان مخصصين عند النقر',
+    icon: HelpCircle,
+    color: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+  },
+};
+
 // Map icon strings to Lucide components
 const iconMap: Record<string, any> = {
   MessageCircle,
@@ -77,6 +131,16 @@ const iconMap: Record<string, any> = {
   Sparkles,
   Palette,
   Layers,
+  Crown,
+  TrendingUp,
+  BookOpen,
+  Compass,
+  Maximize2,
+  SlidersHorizontal,
+  Globe,
+  ShieldAlert,
+  Wrench,
+  Rocket,
 };
 
 export const AdminFeaturesView: React.FC<AdminFeaturesViewProps> = ({ token }) => {
@@ -147,6 +211,66 @@ export const AdminFeaturesView: React.FC<AdminFeaturesViewProps> = ({ token }) =
       showToast(`تم تحديث نطاق ظهور "${feature.nameAr}" بنجاح ✨`);
     } catch (err: any) {
       setError('فشل في حفظ التعديل السريع');
+    }
+  };
+
+  const handleQuickMaintenanceToggle = async (feature: FeatureRuleConfig) => {
+    const isCurrentlyMaintenance = feature.lockedBehavior === 'maintenance';
+    const updated: FeatureRuleConfig = {
+      ...feature,
+      lockedBehavior: isCurrentlyMaintenance ? 'badge_lock' : 'maintenance',
+      customLockTitle: isCurrentlyMaintenance ? undefined : (feature.customLockTitle || 'الميزة تحت الصيانة والتحسينات'),
+      customLockMessage: isCurrentlyMaintenance ? undefined : (feature.customLockMessage || 'نعمل حالياً على تطوير وتحديث هذه الميزة لتكون بأفضل أداء، سنعاود إتاحتها قريباً! 🛠️'),
+    };
+
+    try {
+      const res = await fetch(`/api/admin/features/${feature.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(updated),
+      });
+      if (!res.ok) throw new Error('Failed to update');
+      const saved = await res.json();
+      setFeatures((prev) => prev.map((f) => (f.id === saved.id ? saved : f)));
+      showToast(
+        !isCurrentlyMaintenance
+          ? `تم تفعيل وضع الصيانة لميزة "${feature.nameAr}" بنجاح 🛠️`
+          : `تم إلغاء وضع الصيانة لميزة "${feature.nameAr}" بنجاح ✨`
+      );
+    } catch (err: any) {
+      setError('فشل في تعديل وضع الصيانة');
+    }
+  };
+
+  const handleQuickPlanNoneToggle = async (feature: FeatureRuleConfig) => {
+    const isNone = (feature.allowedPlans || []).includes('none');
+    const updated: FeatureRuleConfig = {
+      ...feature,
+      allowedPlans: isNone ? ['all'] : ['none'],
+    };
+
+    try {
+      const res = await fetch(`/api/admin/features/${feature.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(updated),
+      });
+      if (!res.ok) throw new Error('Failed to update');
+      const saved = await res.json();
+      setFeatures((prev) => prev.map((f) => (f.id === saved.id ? saved : f)));
+      showToast(
+        !isNone
+          ? `تم إخفاء ميزة "${feature.nameAr}" من كافة الباقات (بلا) 🚫`
+          : `تم إعادة إتاحة ميزة "${feature.nameAr}" لكافة الباقات ✨`
+      );
+    } catch (err: any) {
+      setError('فشل في تعديل باقات الميزة');
     }
   };
 
@@ -441,9 +565,19 @@ export const AdminFeaturesView: React.FC<AdminFeaturesViewProps> = ({ token }) =
 
                       {/* Plan Restrictions */}
                       {hasPlans ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-extrabold border ${
+                            feature.allowedPlans.includes('none')
+                              ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                              : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                          }`}
+                        >
                           <Crown className="w-3 h-3" />
-                          <span>باقة: {feature.allowedPlans.join(', ')}</span>
+                          <span>
+                            {feature.allowedPlans.includes('none')
+                              ? 'بلا (مخفية عن كل الباقات)'
+                              : `باقة: ${feature.allowedPlans.join(', ')}`}
+                          </span>
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-800 text-slate-400">
@@ -453,7 +587,7 @@ export const AdminFeaturesView: React.FC<AdminFeaturesViewProps> = ({ token }) =
 
                       {/* Progressive Disclosure */}
                       {hasProgressive && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-extrabold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-extrabold bg-purple-500/20 text-purple-300 border-purple-500/30">
                           <Clock className="w-3 h-3" />
                           <span>
                             {feature.progressiveDisclosure.minAccountAgeDays > 0 &&
@@ -467,11 +601,30 @@ export const AdminFeaturesView: React.FC<AdminFeaturesViewProps> = ({ token }) =
                       )}
 
                       {/* Locked Behavior */}
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-800/80 text-slate-400">
-                        {feature.lockedBehavior === 'badge_lock' ? (
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-extrabold border ${
+                          lockedBehaviorLabels[feature.lockedBehavior]?.color || 'bg-slate-800 text-slate-400 border-slate-700'
+                        }`}
+                      >
+                        {feature.lockedBehavior === 'maintenance' ? (
+                          <>
+                            <Wrench className="w-3 h-3 text-orange-400" />
+                            <span>صيانة 🛠️</span>
+                          </>
+                        ) : feature.lockedBehavior === 'coming_soon' ? (
+                          <>
+                            <Rocket className="w-3 h-3 text-purple-400" />
+                            <span>قريباً 🚀</span>
+                          </>
+                        ) : feature.lockedBehavior === 'badge_lock' ? (
                           <>
                             <Lock className="w-3 h-3 text-amber-400" />
-                            <span>قفل وشارة ترقية</span>
+                            <span>قفل وترقية</span>
+                          </>
+                        ) : feature.lockedBehavior === 'custom_popup' ? (
+                          <>
+                            <HelpCircle className="w-3 h-3 text-indigo-400" />
+                            <span>تنبيه مخصص</span>
                           </>
                         ) : (
                           <>
@@ -480,6 +633,34 @@ export const AdminFeaturesView: React.FC<AdminFeaturesViewProps> = ({ token }) =
                           </>
                         )}
                       </span>
+
+                      {/* Custom Badge Tag */}
+                      {feature.customBadge && feature.customBadge !== 'none' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                          <Tag className="w-2.5 h-2.5" />
+                          <span>
+                            {feature.customBadge === 'new'
+                              ? 'جديد ✨'
+                              : feature.customBadge === 'beta'
+                              ? 'تجريبي 🧪'
+                              : feature.customBadge === 'maintenance'
+                              ? 'صيانة 🛠️'
+                              : feature.customBadge === 'coming_soon'
+                              ? 'قريباً 🚀'
+                              : feature.customBadge === 'vip'
+                              ? 'VIP 👑'
+                              : feature.customBadgeText || 'شارة مخصصة'}
+                          </span>
+                        </span>
+                      )}
+
+                      {/* Device targeting badge */}
+                      {feature.deviceTarget && feature.deviceTarget !== 'all' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                          {feature.deviceTarget === 'mobile_only' ? <Smartphone className="w-2.5 h-2.5" /> : <Laptop className="w-2.5 h-2.5" />}
+                          <span>{feature.deviceTarget === 'mobile_only' ? 'موبايل فقط' : 'كمبيوتر فقط'}</span>
+                        </span>
+                      )}
                     </div>
 
                     {/* Whitelisted users count if applicable */}
@@ -495,23 +676,54 @@ export const AdminFeaturesView: React.FC<AdminFeaturesViewProps> = ({ token }) =
                     )}
                   </div>
 
-                  {/* Quick Audience Switcher Footer */}
-                  <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
-                    <span className="text-[10px] text-slate-500 font-bold">تغيير سريع:</span>
-                    <div className="flex items-center gap-1">
-                      {(['everyone', 'authenticated_only', 'disabled'] as FeatureAudience[]).map((aud) => (
-                        <button
-                          key={aud}
-                          onClick={() => handleQuickAudienceChange(feature, aud)}
-                          className={`px-2 py-1 rounded-lg text-[10px] font-extrabold transition-all ${
-                            feature.targetAudience === aud
-                              ? 'bg-indigo-600 text-white shadow-md'
-                              : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-                          }`}
-                        >
-                          {aud === 'everyone' ? 'الكل' : aud === 'authenticated_only' ? 'مسجلين' : 'تعطيل'}
-                        </button>
-                      ))}
+                  {/* Quick Action Buttons Footer */}
+                  <div className="pt-3 border-t border-slate-800 flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-slate-500 font-bold">نطاق الظهور:</span>
+                      <div className="flex items-center gap-1">
+                        {(['everyone', 'authenticated_only', 'disabled'] as FeatureAudience[]).map((aud) => (
+                          <button
+                            key={aud}
+                            onClick={() => handleQuickAudienceChange(feature, aud)}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-extrabold transition-all ${
+                              feature.targetAudience === aud
+                                ? 'bg-indigo-600 text-white shadow-md'
+                                : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                            }`}
+                          >
+                            {aud === 'everyone' ? 'الكل' : aud === 'authenticated_only' ? 'مسجلين' : 'تعطيل'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Fast Mode Toggles */}
+                    <div className="flex items-center justify-between gap-1 pt-1">
+                      <button
+                        onClick={() => handleQuickMaintenanceToggle(feature)}
+                        className={`flex-1 py-1 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${
+                          feature.lockedBehavior === 'maintenance'
+                            ? 'bg-orange-600 text-white shadow-md shadow-orange-600/30'
+                            : 'bg-slate-800/80 hover:bg-orange-950/40 text-slate-300 hover:text-orange-300 border border-slate-700'
+                        }`}
+                        title="تبديل وضع الصيانة لهذه الميزة فوراً"
+                      >
+                        <Wrench className="w-3 h-3" />
+                        <span>{feature.lockedBehavior === 'maintenance' ? 'الصيانة مفعلة 🛠️' : 'وضع الصيانة'}</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleQuickPlanNoneToggle(feature)}
+                        className={`flex-1 py-1 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${
+                          (feature.allowedPlans || []).includes('none')
+                            ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+                            : 'bg-slate-800/80 hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 border border-slate-700'
+                        }`}
+                        title="إخفاء الميزة تماماً عن جميع الباقات (بلا)"
+                      >
+                        <Ban className="w-3 h-3" />
+                        <span>{(feature.allowedPlans || []).includes('none') ? 'مخفية (بلا) 🚫' : 'إخفاء بالباقات'}</span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -529,7 +741,7 @@ export const AdminFeaturesView: React.FC<AdminFeaturesViewProps> = ({ token }) =
                 <span>محاكي تجربة المستخدم المباشرة (Live Experience Simulator)</span>
               </h3>
               <p className="text-xs text-slate-400 mt-1">
-                اختر مواصفات المستخدم أو الزائر لتشاهد بدقة متناهية ما هي الأزرار والواجهات التي ستظهر له وما هي العناصر التي ستختفي أو تظهر كشعار مقفل.
+                اختر مواصفات المستخدم أو الزائر لتشاهد بدقة متناهية ما هي الأزرار والواجهات التي ستظهر له وما هي العناصر التي ستختفي أو تظهر كشعار مقفل أو في وضع الصيانة.
               </p>
             </div>
 
@@ -647,7 +859,6 @@ export const AdminFeaturesView: React.FC<AdminFeaturesViewProps> = ({ token }) =
                 {features.map((feature) => {
                   const evalStatus = simResults[feature.id];
                   const IconComp = iconMap[feature.icon] || Sparkles;
-                  const isVisible = evalStatus?.enabled || evalStatus?.lockedBehavior === 'badge_lock';
 
                   return (
                     <div
@@ -655,6 +866,10 @@ export const AdminFeaturesView: React.FC<AdminFeaturesViewProps> = ({ token }) =
                       className={`p-4 rounded-2xl border transition-all ${
                         evalStatus?.enabled
                           ? 'bg-emerald-950/20 border-emerald-500/30'
+                          : evalStatus?.lockedBehavior === 'maintenance'
+                          ? 'bg-orange-950/20 border-orange-500/30'
+                          : evalStatus?.lockedBehavior === 'coming_soon'
+                          ? 'bg-purple-950/20 border-purple-500/30'
                           : evalStatus?.lockedBehavior === 'badge_lock'
                           ? 'bg-amber-950/20 border-amber-500/30'
                           : 'bg-slate-900/40 border-slate-800 opacity-60'
@@ -669,6 +884,16 @@ export const AdminFeaturesView: React.FC<AdminFeaturesViewProps> = ({ token }) =
                         {evalStatus?.enabled ? (
                           <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                             مفتوحة وظاهرة ✨
+                          </span>
+                        ) : evalStatus?.lockedBehavior === 'maintenance' ? (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-orange-500/20 text-orange-300 border border-orange-500/30 flex items-center gap-1">
+                            <Wrench className="w-2.5 h-2.5" />
+                            <span>صيانة 🛠️</span>
+                          </span>
+                        ) : evalStatus?.lockedBehavior === 'coming_soon' ? (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-1">
+                            <Rocket className="w-2.5 h-2.5" />
+                            <span>قريباً 🚀</span>
                           </span>
                         ) : evalStatus?.lockedBehavior === 'badge_lock' ? (
                           <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
@@ -699,7 +924,7 @@ export const AdminFeaturesView: React.FC<AdminFeaturesViewProps> = ({ token }) =
 
       {/* Edit Feature Rule Comprehensive Modal */}
       {editingFeature && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in overflow-y-auto">
           <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-2xl w-full shadow-2xl space-y-6 my-8 max-h-[90vh] overflow-y-auto text-xs">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
@@ -774,29 +999,63 @@ export const AdminFeaturesView: React.FC<AdminFeaturesViewProps> = ({ token }) =
               </div>
             )}
 
-            {/* 2. Subscription Plans Entitlement */}
-            <div className="space-y-2">
-              <label className="font-extrabold text-slate-200 text-xs flex items-center gap-1.5">
-                <Crown className="w-4 h-4 text-amber-400" />
-                <span>2. ربط الميزة بالباقات والخطط (Plan Tiers):</span>
-              </label>
+            {/* 2. Subscription Plans Entitlement with "None" support */}
+            <div className="space-y-3 p-4 rounded-2xl bg-slate-950 border border-slate-800">
+              <div className="flex items-center justify-between">
+                <label className="font-extrabold text-slate-200 text-xs flex items-center gap-1.5">
+                  <Crown className="w-4 h-4 text-amber-400" />
+                  <span>2. ربط الميزة بالباقات والخطط (Plan Tiers):</span>
+                </label>
+
+                {/* Quick Presets */}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditingFeature({ ...editingFeature, allowedPlans: ['all'] })}
+                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-[10px] font-bold text-slate-300 rounded-lg"
+                  >
+                    الكل
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingFeature({ ...editingFeature, allowedPlans: ['none'] })}
+                    className="px-2 py-1 bg-rose-900/40 hover:bg-rose-800/60 text-[10px] font-bold text-rose-300 rounded-lg border border-rose-500/30"
+                  >
+                    بلا (إخفاء) 🚫
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingFeature({ ...editingFeature, allowedPlans: ['premium', 'pro'] })}
+                    className="px-2 py-1 bg-amber-900/40 hover:bg-amber-800/60 text-[10px] font-bold text-amber-300 rounded-lg border border-amber-500/30"
+                  >
+                    مدفوع فقط 👑
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
-                  { id: 'all', label: 'متاحة لكل الباقات' },
-                  { id: 'free', label: 'الخطة المجانية' },
-                  { id: 'premium', label: 'الخطة المتقدمة Premium' },
-                  { id: 'pro', label: 'الخطة الاحترافية Pro' },
+                  { id: 'all', label: 'متاحة لكل الباقات', desc: 'تظهر للجميع' },
+                  { id: 'none', label: 'بلا / إخفاء من الجميع 🚫', desc: 'لا تظهر لأي باقة' },
+                  { id: 'free', label: 'الخطة المجانية Free', desc: 'الباقة العادية' },
+                  { id: 'premium', label: 'الخطة المتقدمة Premium', desc: 'باقة الأفراد' },
+                  { id: 'pro', label: 'الخطة الاحترافية Pro', desc: 'باقة العائلة والبرو' },
                 ].map((planOption) => {
-                  const isAll = (editingFeature.allowedPlans || []).includes('all');
-                  const isChecked = isAll
-                    ? planOption.id === 'all'
-                    : (editingFeature.allowedPlans || []).includes(planOption.id);
+                  const currentPlans = editingFeature.allowedPlans || ['all'];
+                  const isChecked =
+                    planOption.id === 'all'
+                      ? currentPlans.includes('all')
+                      : planOption.id === 'none'
+                      ? currentPlans.includes('none')
+                      : !currentPlans.includes('none') && currentPlans.includes(planOption.id);
 
                   const togglePlan = () => {
                     if (planOption.id === 'all') {
                       setEditingFeature({ ...editingFeature, allowedPlans: ['all'] });
+                    } else if (planOption.id === 'none') {
+                      setEditingFeature({ ...editingFeature, allowedPlans: ['none'] });
                     } else {
-                      let current = (editingFeature.allowedPlans || []).filter((p) => p !== 'all');
+                      let current = currentPlans.filter((p) => p !== 'all' && p !== 'none');
                       if (current.includes(planOption.id)) {
                         current = current.filter((p) => p !== planOption.id);
                       } else {
@@ -814,11 +1073,15 @@ export const AdminFeaturesView: React.FC<AdminFeaturesViewProps> = ({ token }) =
                       onClick={togglePlan}
                       className={`p-2.5 rounded-2xl font-bold flex items-center justify-between border transition-all ${
                         isChecked
-                          ? 'bg-amber-500/20 border-amber-500 text-amber-300'
-                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800'
+                          ? planOption.id === 'none'
+                            ? 'bg-rose-500/20 border-rose-500 text-rose-300'
+                            : 'bg-amber-500/20 border-amber-500 text-amber-300'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800'
                       }`}
                     >
-                      <span className="text-[11px] truncate">{planOption.label}</span>
+                      <div className="text-start">
+                        <span className="text-[11px] block">{planOption.label}</span>
+                      </div>
                       {isChecked && <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
                     </button>
                   );
@@ -826,14 +1089,219 @@ export const AdminFeaturesView: React.FC<AdminFeaturesViewProps> = ({ token }) =
               </div>
             </div>
 
-            {/* 3. Progressive Disclosure (الكشف التدريجي مع الوقت والتفاعل) */}
+            {/* 3. Locked Behavior & Custom Alert Messages */}
+            <div className="space-y-3 p-4 rounded-2xl bg-slate-950 border border-slate-800">
+              <label className="font-extrabold text-slate-200 text-xs flex items-center gap-1.5">
+                <Lock className="w-4 h-4 text-orange-400" />
+                <span>3. سلوك العنصر عند عدم استيفاء الشروط أو الصيانة (Locked Behavior):</span>
+              </label>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                {(
+                  [
+                    'hide',
+                    'badge_lock',
+                    'maintenance',
+                    'coming_soon',
+                    'custom_popup',
+                  ] as FeatureLockedBehavior[]
+                ).map((behavior) => {
+                  const isSelected = editingFeature.lockedBehavior === behavior;
+                  const item = lockedBehaviorLabels[behavior];
+                  const Icon = item.icon;
+
+                  return (
+                    <button
+                      key={behavior}
+                      type="button"
+                      onClick={() => setEditingFeature({ ...editingFeature, lockedBehavior: behavior })}
+                      className={`p-3 rounded-2xl font-bold flex items-start gap-2.5 border transition-all text-start ${
+                        isSelected
+                          ? behavior === 'maintenance'
+                            ? 'bg-orange-600 border-orange-400 text-white shadow-lg shadow-orange-600/30'
+                            : behavior === 'coming_soon'
+                            ? 'bg-purple-600 border-purple-400 text-white shadow-lg shadow-purple-600/30'
+                            : behavior === 'badge_lock'
+                            ? 'bg-amber-600 border-amber-400 text-white shadow-lg shadow-amber-600/30'
+                            : 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-600/30'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs">{item.label}</p>
+                        <p className={`text-[10px] mt-0.5 ${isSelected ? 'text-white/80' : 'text-slate-500'}`}>
+                          {item.desc}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Custom Title and Message Configuration */}
+              {editingFeature.lockedBehavior !== 'hide' && (
+                <div className="space-y-3 pt-2 border-t border-slate-800">
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-300 text-[11px]">
+                      عنوان نافذة التنبيه أو الصيانة (Custom Title):
+                    </label>
+                    <input
+                      type="text"
+                      value={editingFeature.customLockTitle || ''}
+                      onChange={(e) =>
+                        setEditingFeature({ ...editingFeature, customLockTitle: e.target.value })
+                      }
+                      placeholder={
+                        editingFeature.lockedBehavior === 'maintenance'
+                          ? 'الميزة تحت الصيانة والتحسينات 🛠️'
+                          : editingFeature.lockedBehavior === 'coming_soon'
+                          ? 'قريباً جداً في التحديث القادم 🚀'
+                          : 'ترقية باقة الاشتراك مطلوبة 👑'
+                      }
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-300 text-[11px]">
+                      رسالة التوضيح المخصصة عند الضغط على الميزة المقفلة:
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={editingFeature.customLockMessage || ''}
+                      onChange={(e) =>
+                        setEditingFeature({ ...editingFeature, customLockMessage: e.target.value })
+                      }
+                      placeholder={
+                        editingFeature.lockedBehavior === 'maintenance'
+                          ? 'نعمل حالياً على تحديث هذه الميزة لتحسين سرعتها ودقتها، سنعاود فتحها خلال الساعات القادمة.'
+                          : editingFeature.lockedBehavior === 'coming_soon'
+                          ? 'هذه الميزة الذكية قيد التطوير والإطلاق قريباً جداً، ترقبوها!'
+                          : 'هذه الميزة مخصصة لمشتركي باقة البريميوم، قم بالترقية الآن للاستفادة الكاملة ✨'
+                      }
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500 resize-none"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 4. Granular Targeting: Device & Language */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-950 border border-slate-800">
+              {/* Device Targeting */}
+              <div className="space-y-1.5">
+                <label className="font-extrabold text-slate-200 text-xs flex items-center gap-1.5">
+                  <Smartphone className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>استهداف نوع الجهاز (Device Target):</span>
+                </label>
+                <select
+                  value={editingFeature.deviceTarget || 'all'}
+                  onChange={(e: any) =>
+                    setEditingFeature({
+                      ...editingFeature,
+                      deviceTarget: e.target.value as FeatureDeviceTarget,
+                    })
+                  }
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="all">كافة الأجهزة (موبايل وكمبيوتر)</option>
+                  <option value="mobile_only">الهواتف والأجهزة الذكية فقط 📱</option>
+                  <option value="desktop_only">أجهزة الكمبيوتر وسطح المكتب فقط 💻</option>
+                </select>
+              </div>
+
+              {/* Language Targeting */}
+              <div className="space-y-1.5">
+                <label className="font-extrabold text-slate-200 text-xs flex items-center gap-1.5">
+                  <Languages className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>استهداف لغة الواجهة (Language Target):</span>
+                </label>
+                <select
+                  value={editingFeature.languageTarget || 'all'}
+                  onChange={(e: any) =>
+                    setEditingFeature({
+                      ...editingFeature,
+                      languageTarget: e.target.value as FeatureLanguageTarget,
+                    })
+                  }
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 text-xs focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="all">كافة اللغات 🌐</option>
+                  <option value="ar_only">اللغة العربية فقط 🇸🇦</option>
+                  <option value="en_only">اللغة الإنجليزية فقط 🇬🇧</option>
+                </select>
+              </div>
+            </div>
+
+            {/* 5. Custom Button Badge (شارة تسويقية أو تنبيهية على الزر) */}
+            <div className="space-y-2.5 p-4 rounded-2xl bg-slate-950 border border-slate-800">
+              <div className="flex items-center justify-between">
+                <label className="font-extrabold text-slate-200 text-xs flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>شارة تسويقية أو تنبيهية على الزر (Visual Badge):</span>
+                </label>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { type: 'none', label: 'بدون شارة' },
+                  { type: 'new', label: 'جديد ✨' },
+                  { type: 'beta', label: 'تجريبي 🧪' },
+                  { type: 'maintenance', label: 'صيانة 🛠️' },
+                  { type: 'coming_soon', label: 'قريباً 🚀' },
+                  { type: 'vip', label: 'VIP 👑' },
+                  { type: 'custom', label: 'نص مخصص ✍️' },
+                ].map((badgeOpt) => {
+                  const isCurrent = (editingFeature.customBadge || 'none') === badgeOpt.type;
+                  return (
+                    <button
+                      key={badgeOpt.type}
+                      type="button"
+                      onClick={() =>
+                        setEditingFeature({
+                          ...editingFeature,
+                          customBadge: badgeOpt.type as FeatureCustomBadge,
+                        })
+                      }
+                      className={`p-2 rounded-xl text-xs font-bold border transition-all ${
+                        isCurrent
+                          ? 'bg-indigo-600 border-indigo-400 text-white shadow-md'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800'
+                      }`}
+                    >
+                      {badgeOpt.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {editingFeature.customBadge === 'custom' && (
+                <div className="pt-2">
+                  <input
+                    type="text"
+                    value={editingFeature.customBadgeText || ''}
+                    onChange={(e) =>
+                      setEditingFeature({
+                        ...editingFeature,
+                        customBadgeText: e.target.value,
+                      })
+                    }
+                    placeholder="اكتب النص مثل: حصري، خصم 50%، ميزة الأسبوع..."
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* 6. Progressive Disclosure (الكشف التدريجي مع الوقت والتفاعل) */}
             <div className="space-y-3 p-4 rounded-2xl bg-slate-950 border border-slate-800">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-purple-400" />
                   <div>
                     <h4 className="font-extrabold text-slate-200 text-xs">
-                      3. نظام الكشف التدريجي المدهش (Progressive Disclosure)
+                      6. نظام الكشف التدريجي المدهش (Progressive Disclosure)
                     </h4>
                     <p className="text-[10px] text-slate-400">
                       إخفاء الميزة في البداية لتسهيل الواجهة ثم إظهارها تلقائياً بعد فترة من الاستخدام لإبهار العميل.
@@ -855,7 +1323,7 @@ export const AdminFeaturesView: React.FC<AdminFeaturesViewProps> = ({ token }) =
                       },
                     })
                   }
-                  className="w-4 h-4 accent-purple-600 rounded"
+                  className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
                 />
               </div>
 
@@ -921,62 +1389,6 @@ export const AdminFeaturesView: React.FC<AdminFeaturesViewProps> = ({ token }) =
               )}
             </div>
 
-            {/* 4. Locked Behavior & Custom Message */}
-            <div className="space-y-3">
-              <label className="font-extrabold text-slate-200 text-xs flex items-center gap-1.5">
-                <Lock className="w-4 h-4 text-amber-400" />
-                <span>4. سلوك العنصر عند عدم استيفاء الشروط:</span>
-              </label>
-
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setEditingFeature({ ...editingFeature, lockedBehavior: 'hide' })}
-                  className={`p-3 rounded-2xl font-bold flex items-center gap-2 border transition-all ${
-                    editingFeature.lockedBehavior === 'hide'
-                      ? 'bg-indigo-600 border-indigo-400 text-white'
-                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800'
-                  }`}
-                >
-                  <EyeOff className="w-4 h-4" />
-                  <div className="text-start">
-                    <p className="text-xs">إخفاء تام من الواجهة</p>
-                    <p className="text-[10px] text-slate-300/70">العنصر يختفي تماماً ولا يراه المستخدم</p>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setEditingFeature({ ...editingFeature, lockedBehavior: 'badge_lock' })}
-                  className={`p-3 rounded-2xl font-bold flex items-center gap-2 border transition-all ${
-                    editingFeature.lockedBehavior === 'badge_lock'
-                      ? 'bg-amber-600 border-amber-400 text-white'
-                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800'
-                  }`}
-                >
-                  <Lock className="w-4 h-4" />
-                  <div className="text-start">
-                    <p className="text-xs">إظهار مع شارة قفل وترقية</p>
-                    <p className="text-[10px] text-slate-300/70">يظهر وعليه قفل وعند الضغط يطلب الترقية</p>
-                  </div>
-                </button>
-              </div>
-
-              {/* Custom Prompt Message */}
-              <div className="space-y-1">
-                <label className="font-bold text-slate-300 text-[11px]">
-                  رسالة التوضيح المخصصة عند الضغط على الميزة المقفلة:
-                </label>
-                <input
-                  type="text"
-                  value={editingFeature.customLockMessage || ''}
-                  onChange={(e) => setEditingFeature({ ...editingFeature, customLockMessage: e.target.value })}
-                  placeholder="مثال: هذه الميزة مخصصة لمشتركي باقة البريميوم، قم بالترقية الآن ✨"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 placeholder-slate-600"
-                />
-              </div>
-            </div>
-
             {/* Modal Actions Footer */}
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
               <button
@@ -993,7 +1405,7 @@ export const AdminFeaturesView: React.FC<AdminFeaturesViewProps> = ({ token }) =
                 className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
               >
                 <Check className="w-4 h-4" />
-                <span>{saving ? 'جاري الحفظ...' : 'حفظ ونشر التعديل فوراً'}</span>
+                <span>{saving ? 'جاري الحفظ...' : 'حفظ ونشر التعديل فوراً 🚀'}</span>
               </button>
             </div>
           </div>
