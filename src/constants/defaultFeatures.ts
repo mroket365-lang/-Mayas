@@ -279,7 +279,7 @@ export const defaultFeaturesList: FeatureRuleConfig[] = [
     nameEn: 'Focus Mode (Hide Bottom Nav)',
     descriptionAr: 'إخفاء شريط التنقل السفلي مؤقتاً لتوسيع مساحة المحادثة وزيادة التركيز',
     descriptionEn: 'Temporarily hide bottom navigation bar to maximize conversation display and focus',
-    category: 'features',
+    category: 'actions',
     icon: 'Maximize2',
     targetAudience: 'everyone',
     specificUsers: [],

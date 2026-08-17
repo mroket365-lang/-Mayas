@@ -721,6 +721,8 @@ export default function App() {
             isLoading={isLoadingAI}
             onOpenPermissions={() => setIsPermissionsOpen(true)}
             onOpenAuth={() => setIsAuthOpen(true)}
+            isFocusMode={isFocusMode}
+            onToggleFocusMode={() => setIsFocusMode((prev) => !prev)}
           />
         )}
 
@@ -773,6 +775,7 @@ export default function App() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         profile={profile}
+        isFocusMode={isFocusMode}
       />
 
       {!profile.onboardingCompleted && (
