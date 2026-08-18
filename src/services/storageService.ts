@@ -1,4 +1,4 @@
-import { CompanionItem, ChatMessage, UserProfile, DailyReport, DailyCheckIn } from '../types';
+import { CompanionItem, ChatMessage, UserProfile, DailyReport, DailyCheckIn, TaskCategory } from '../types';
 
 const STORAGE_KEYS = {
   PROFILE: 'rafiq_user_profile',
@@ -13,6 +13,44 @@ const STORAGE_KEYS = {
 
 // 24-hour expiration for guest local sessions (Standard AI companion security & privacy practice)
 const GUEST_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+export function inferCategoryForStorage(item: CompanionItem): TaskCategory {
+  if (item.category && item.category.trim()) return item.category;
+
+  const combined = `${item.title || ''} ${item.description || ''}`.toLowerCase();
+
+  // Urgent detection
+  const urgentKeywords = [
+    'عاجل', 'طارئ', 'ضروري جدا', 'حالاً', 'فورا', 'فوراً', 'أهمية قصوى', 'مستعجل',
+    'ضروري اليوم', 'لا تؤجل', 'أمر طارئ', 'حرج', 'urgent', 'asap', 'critical', 'immediately', 'emergency'
+  ];
+  if (item.priority === 'high' || urgentKeywords.some((kw) => combined.includes(kw))) {
+    return 'urgent';
+  }
+
+  // Work detection
+  const workKeywords = [
+    'عمل', 'شغل', 'وظيفة', 'مشروع', 'مكتب', 'اجتماع', 'عميل', 'زبون', 'تقرير', 'بريد عمل',
+    'شركة', 'مدير', 'فريق العمل', 'عرض تقديمي', 'تسليم مشروع', 'مبيعات', 'تسويق', 'كود', 'برمجة',
+    'work', 'job', 'project', 'client', 'meeting', 'report', 'presentation', 'office', 'boss', 'deadline'
+  ];
+  if (workKeywords.some((kw) => combined.includes(kw))) {
+    return 'work';
+  }
+
+  // Personal detection
+  const personalKeywords = [
+    'شخصي', 'بيت', 'منزل', 'أهل', 'عائلة', 'زوجتي', 'زوجي', 'ولدي', 'بنتي', 'امي', 'أمي', 'ابوي', 'أبي',
+    'سوبرماركت', 'بقالة', 'صيدلية', 'دواء', 'جيم', 'نادي', 'رياضة', 'مشي', 'صلاة', 'مسجد', 'قراءة',
+    'كتاب', 'راحة', 'نوم', 'حلاقة', 'سيارة', 'غسيل', 'طبخ', 'عشاء', 'غداء', 'فطور', 'تسوق',
+    'personal', 'home', 'family', 'mom', 'dad', 'grocery', 'gym', 'workout', 'doctor', 'pharmacy', 'medicine', 'prayer'
+  ];
+  if (personalKeywords.some((kw) => combined.includes(kw))) {
+    return 'personal';
+  }
+
+  return 'personal';
+}
 
 export const defaultProfile: UserProfile = {
   displayName: 'غالي',
@@ -125,7 +163,11 @@ export const storageService = {
     if (duplicate) {
       return items;
     }
-    const updated = [item, ...items];
+    const enrichedItem: CompanionItem = {
+      ...item,
+      category: inferCategoryForStorage(item),
+    };
+    const updated = [enrichedItem, ...items];
     this.saveItems(updated);
     return updated;
   },

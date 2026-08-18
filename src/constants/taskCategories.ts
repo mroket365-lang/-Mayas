@@ -13,6 +13,18 @@ export interface TaskCategoryConfig {
 
 export const TASK_CATEGORIES: TaskCategoryConfig[] = [
   {
+    id: 'urgent',
+    nameAr: 'عاجل وطارئ',
+    nameEn: 'Urgent & Critical',
+    icon: '⚡',
+    bgClass: 'bg-red-500/15 dark:bg-red-950/30',
+    textClass: 'text-red-700 dark:text-red-300',
+    borderClass: 'border-red-500/30 dark:border-red-500/40',
+    dotClass: 'bg-red-500',
+    badgeClass: 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30',
+    activeChipClass: 'bg-red-600 text-white border-red-600 shadow-sm',
+  },
+  {
     id: 'work',
     nameAr: 'عمل ومشاريع',
     nameEn: 'Work & Projects',

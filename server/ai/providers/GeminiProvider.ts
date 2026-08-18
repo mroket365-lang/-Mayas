@@ -55,7 +55,7 @@ export const geminiToolDeclarations: FunctionDeclaration[] = [
         },
         category: {
           type: Type.STRING,
-          description: 'Task/item category: work, personal, health, finance, education, home, other',
+          description: 'Task/item category tag based on message context: urgent (for emergencies, ASAP, critical items, deadlines today), work (for job, projects, meetings, business, clients, career), personal (for private life, personal chores, family, health, habits, general), health, finance, education, home, other',
         },
         repeatRule: {
           type: Type.STRING,

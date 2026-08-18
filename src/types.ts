@@ -54,6 +54,7 @@ export interface GoalAIAnalysis {
 }
 
 export type TaskCategory = 
+  | 'urgent'
   | 'work' 
   | 'personal' 
   | 'health' 

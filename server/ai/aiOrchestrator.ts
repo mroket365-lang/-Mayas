@@ -3,7 +3,7 @@ import { OrchestrationRequest, OrchestrationResponse } from './types';
 import { analyzeIntentAndComplexity } from './intentEngine';
 import { filterAndFormatContext } from './memoryManager';
 import { ModelRouter } from './modelRouter';
-import { validateAndExecuteActions } from './actionManager';
+import { validateAndExecuteActions, inferItemCategory } from './actionManager';
 import { synthesizeResponses } from './evaluator';
 import { SubscriptionService } from '../services/subscriptionService.js';
 import { db } from '../db/database.js';
@@ -103,6 +103,7 @@ function generateSmartFallbackReply(
   if (reminderMatch && reminderMatch[1]) {
     const title = reminderMatch[1].trim();
     const isAppointment = cleanMsg.includes('موعد') || cleanMsg.includes('appointment');
+    const inferredCat = inferItemCategory(title, `تم إنشاؤها عبر الرفيق: "${title}"`, undefined, undefined, currentDateStr, currentDateStr);
     const newItem: CompanionItem = {
       id: 'item_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
       userId: profile.id || 'user_default_01',
@@ -113,7 +114,8 @@ function generateSmartFallbackReply(
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       dueDate: currentDateStr,
-      priority: 'medium',
+      priority: inferredCat === 'urgent' ? 'high' : 'medium',
+      category: inferredCat,
       repeatRule: 'none',
       progressPercent: 0,
     };

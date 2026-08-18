@@ -19,7 +19,7 @@ export const openAIToolDeclarations: OpenAI.ChatCompletionTool[] = [
           location: { type: 'string', description: 'Location if applicable.' },
           person: { type: 'string', description: 'Person involved.' },
           priority: { type: 'string', description: 'Priority: low, medium, or high.' },
-          category: { type: 'string', description: 'Task/item category: work, personal, health, finance, education, home, other' },
+          category: { type: 'string', description: 'Task/item category tag based on message context: urgent, work, personal, health, finance, education, home, other' },
           repeatRule: { type: 'string', description: 'Repetition: none, daily, weekly, or monthly.' },
           subtasks: { type: 'array', items: { type: 'string' }, description: 'Array of subtask titles.' },
           startDate: { type: 'string', description: 'Start date YYYY-MM-DD for strategic goals or plans.' },

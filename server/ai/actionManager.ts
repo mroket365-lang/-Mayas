@@ -1,5 +1,76 @@
-import { CompanionItem, UserProfile, ActionSummary } from '../../src/types';
+import { CompanionItem, UserProfile, ActionSummary, TaskCategory } from '../../src/types';
 import { ToolCallRequest } from './types';
+
+/**
+ * Automatically infers and tags an item as 'urgent', 'work', or 'personal' (or domain-specific)
+ * based on the title, description, priority, and surrounding context.
+ */
+export function inferItemCategory(
+  title: string,
+  description?: string,
+  explicitCategory?: string,
+  priority?: string,
+  dueDate?: string,
+  currentDateStr?: string
+): TaskCategory {
+  if (explicitCategory && explicitCategory.trim()) {
+    const rawCat = explicitCategory.trim().toLowerCase();
+    if (['urgent', 'work', 'personal', 'health', 'finance', 'education', 'home', 'other'].includes(rawCat)) {
+      return rawCat as TaskCategory;
+    }
+    if (rawCat.includes('عاجل') || rawCat.includes('طارئ') || rawCat.includes('urgent') || rawCat.includes('asap')) return 'urgent';
+    if (rawCat.includes('عمل') || rawCat.includes('شغل') || rawCat.includes('work') || rawCat.includes('مكتب') || rawCat.includes('مشروع')) return 'work';
+    if (rawCat.includes('شخص') || rawCat.includes('بيت') || rawCat.includes('personal') || rawCat.includes('اهل') || rawCat.includes('حياة')) return 'personal';
+    return rawCat as TaskCategory;
+  }
+
+  const combined = `${title || ''} ${description || ''}`.toLowerCase();
+
+  // 1. Check Urgent keywords & indicators
+  const urgentKeywords = [
+    'عاجل', 'طارئ', 'ضروري جدا', 'حالاً', 'فورا', 'فوراً', 'أهمية قصوى', 'مستعجل',
+    'ضروري اليوم', 'لا تؤجل', 'أمر طارئ', 'حرج', 'حالا',
+    'urgent', 'asap', 'critical', 'immediately', 'emergency', 'right now', 'high priority', 'deadline today'
+  ];
+  if (
+    priority === 'high' && (combined.includes('اليوم') || combined.includes('today') || combined.includes('سريع') || combined.includes('الان') || combined.includes('الآن')) ||
+    urgentKeywords.some((kw) => combined.includes(kw))
+  ) {
+    return 'urgent';
+  }
+
+  // 2. Check Work keywords & indicators
+  const workKeywords = [
+    'عمل', 'شغل', 'وظيفة', 'مشروع', 'مكتب', 'اجتماع', 'عميل', 'زبون', 'تقرير', 'بريد عمل',
+    'شركة', 'مدير', 'فريق العمل', 'عرض تقديمي', 'تسليم مشروع', 'مبيعات', 'تسويق', 'فاتورة عمل',
+    'دوام', 'مهنة', 'كود', 'برمجة', 'تصميم للعميل', 'مقابلة عمل', 'ميتنج', 'سيرفر',
+    'work', 'job', 'project', 'client', 'meeting', 'report', 'presentation', 'office',
+    'boss', 'manager', 'company', 'deadline', 'sales', 'marketing', 'code', 'deploy', 'interview'
+  ];
+  if (workKeywords.some((kw) => combined.includes(kw))) {
+    return 'work';
+  }
+
+  // 3. Check Personal keywords & indicators (health, family, leisure, home, personal chores)
+  const personalKeywords = [
+    'شخصي', 'بيت', 'منزل', 'أهل', 'عائلة', 'زوجتي', 'زوجي', 'ولدي', 'بنتي', 'امي', 'أمي', 'ابوي', 'أبي',
+    'سوبرماركت', 'بقالة', 'صيدلية', 'دواء', 'جيم', 'نادي', 'رياضة', 'مشي', 'صلاة', 'مسجد', 'قراءة',
+    'كتاب', 'راحة', 'نوم', 'حلاقة', 'سيارة', 'غسيل', 'طبخ', 'عشاء', 'غداء', 'فطور', 'تسوق',
+    'personal', 'home', 'family', 'mom', 'dad', 'wife', 'husband', 'son', 'daughter', 'grocery',
+    'gym', 'workout', 'doctor', 'pharmacy', 'medicine', 'prayer', 'read', 'relax', 'shopping', 'dinner'
+  ];
+  if (personalKeywords.some((kw) => combined.includes(kw))) {
+    return 'personal';
+  }
+
+  // If priority is high, tag as urgent
+  if (priority === 'high') {
+    return 'urgent';
+  }
+
+  // Default to personal for everyday companion tasks
+  return 'personal';
+}
 
 export function validateAndExecuteActions(
   toolCalls: ToolCallRequest[],
@@ -50,6 +121,17 @@ export function validateAndExecuteActions(
         })
         .filter((m: { title: string }) => m.title.length > 0);
 
+      const inferredCategory = inferItemCategory(
+        title,
+        args.description,
+        args.category,
+        args.priority,
+        args.dueDate || args.endDate,
+        currentDateStr
+      );
+
+      const priorityVal = (args.priority as CompanionItem['priority']) || (inferredCategory === 'urgent' ? 'high' : 'medium');
+
       const newItem: CompanionItem = {
         id: 'item_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
         userId: 'user_local',
@@ -63,9 +145,9 @@ export function validateAndExecuteActions(
         dueTime: args.dueTime || undefined,
         location: args.location || undefined,
         person: args.person || undefined,
-        priority: (args.priority as CompanionItem['priority']) || 'medium',
+        priority: priorityVal,
         repeatRule: (args.repeatRule as CompanionItem['repeatRule']) || 'none',
-        category: args.category || undefined,
+        category: inferredCategory,
         subtasks: parsedSubtasks.length > 0 ? parsedSubtasks : undefined,
         progressPercent: args.targetValue && args.targetValue > 0 ? 0 : 0,
         // Long notes & Goal fields
