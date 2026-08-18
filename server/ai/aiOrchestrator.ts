@@ -174,9 +174,10 @@ export async function processOrchestratedChatStream(
   // 2. Memory & Context Filtering
   const { systemInstruction } = filterAndFormatContext(profile, items, message, clientTimeContext);
 
-  // 3. Prepare Prompt Contents
+  // 3. Prepare Prompt Contents (Adaptive History Slicing for Token Savings)
+  const historySliceCount = intent.complexity === 'high' ? 14 : intent.complexity === 'medium' ? 8 : 4;
   const formattedContents: Array<{ role: string; parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> }> =
-    history.slice(-16).map((h) => ({
+    history.slice(-historySliceCount).map((h) => ({
       role: h.sender === 'user' ? 'user' : 'model',
       parts: [{ text: h.text }],
     }));
@@ -201,7 +202,8 @@ export async function processOrchestratedChatStream(
   const aiParams = {
     systemInstruction,
     contents: formattedContents,
-    temperature: 0.3,
+    temperature: intent.complexity === 'high' ? 0.4 : 0.25,
+    preferredModel: intent.preferredModel,
   };
 
   try {
@@ -311,9 +313,10 @@ export async function processOrchestratedChat(
   // 2. Memory & Context Filtering
   const { systemInstruction } = filterAndFormatContext(profile, items, message, clientTimeContext);
 
-  // 3. Prepare Prompt Contents
+  // 3. Prepare Prompt Contents (Adaptive History Slicing for Token Savings)
+  const historySliceCount = intent.complexity === 'high' ? 14 : intent.complexity === 'medium' ? 8 : 4;
   const formattedContents: Array<{ role: string; parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> }> =
-    history.slice(-16).map((h) => ({
+    history.slice(-historySliceCount).map((h) => ({
       role: h.sender === 'user' ? 'user' : 'model',
       parts: [{ text: h.text }],
     }));
@@ -338,7 +341,8 @@ export async function processOrchestratedChat(
   const aiParams = {
     systemInstruction,
     contents: formattedContents,
-    temperature: 0.3,
+    temperature: intent.complexity === 'high' ? 0.4 : 0.25,
+    preferredModel: intent.preferredModel,
   };
 
   try {

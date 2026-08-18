@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ShieldAlert, AlertTriangle, Minimize2 } from 'lucide-react';
 import { UserProfile, CompanionItem, ChatMessage } from './types';
 import { storageService } from './services/storageService';
@@ -45,6 +45,7 @@ export interface SystemPublicSettings {
 }
 
 export default function App() {
+  const clientSessionIdRef = useRef('sess_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now());
   const [isAdminRoute, setIsAdminRoute] = useState<boolean>(() => {
     return window.location.pathname.startsWith('/admin');
   });
@@ -214,6 +215,22 @@ export default function App() {
     // Cross-device chat sync event
     const unsubChat = realtimeClient.subscribe('user_chat_sync', (data: any) => {
       if (!data) return;
+
+      // Prevent duplicate messages and screen shaking by ignoring self-originated chat syncs
+      if (data.senderSessionId && data.senderSessionId === clientSessionIdRef.current) {
+        if (Array.isArray(data.createdOrUpdatedItems) && data.createdOrUpdatedItems.length > 0) {
+          setItems((prev) => {
+            const itemMap = new Map<string, CompanionItem>();
+            prev.forEach((it) => { if (it?.id) itemMap.set(it.id, it); });
+            data.createdOrUpdatedItems.forEach((it: CompanionItem) => { if (it?.id) itemMap.set(it.id, it); });
+            const merged = Array.from(itemMap.values());
+            storageService.saveItems(merged);
+            return merged;
+          });
+        }
+        return;
+      }
+
       if (data.newUserMessage || data.newAiMessage) {
         setMessages((prev) => {
           const msgMap = new Map<string, ChatMessage>();
@@ -465,6 +482,9 @@ export default function App() {
           mediaBase64: media?.base64,
           mediaMimeType: media?.mimeType,
           clientTimeContext,
+          userMessageId: userMsg.id,
+          aiMessageId: aiMsgId,
+          clientSessionId: clientSessionIdRef.current,
         }),
       });
 
@@ -530,6 +550,9 @@ export default function App() {
             mediaBase64: media?.base64,
             mediaMimeType: media?.mimeType,
             clientTimeContext,
+            userMessageId: userMsg.id,
+            aiMessageId: aiMsgId,
+            clientSessionId: clientSessionIdRef.current,
           }),
         });
 

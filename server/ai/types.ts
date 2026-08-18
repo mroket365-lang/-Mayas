@@ -30,6 +30,11 @@ export type IntentCategory =
   | 'venting'
   | 'conversation'
   | 'schedule_query'
+  | 'schedule_today_query'
+  | 'schedule_remaining_query'
+  | 'notes_query'
+  | 'routine_query'
+  | 'goals_query'
   | 'time_query'
   | 'daily_review';
 
@@ -48,6 +53,7 @@ export interface IntentAnalysis {
   confidence: number;
   isActionRequired: boolean;
   suggestedMultiModel: boolean;
+  preferredModel?: string;
 }
 
 export interface OrchestrationRequest {

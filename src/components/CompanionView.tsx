@@ -98,10 +98,10 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(({
     <div
       className={`flex flex-col ${
         msg.sender === 'user' ? 'items-end' : 'items-start'
-      } space-y-1.5 animate-fade-in`}
+      } space-y-1.5`}
     >
       <div
-        className={`max-w-[85%] sm:max-w-[80%] rounded-3xl px-4 py-3 shadow-sm text-sm leading-relaxed min-w-0 break-words [overflow-wrap:anywhere] ${
+        className={`max-w-[85%] sm:max-w-[80%] rounded-3xl px-4 py-3 shadow-sm text-sm leading-relaxed min-w-0 break-words [overflow-wrap:anywhere] transition-colors ${
           msg.sender === 'user'
             ? 'bg-[var(--accent-sage)] text-white rounded-br-none'
             : 'bg-[var(--bg-surface)] text-[var(--text-main)] border border-[var(--border-color)] rounded-bl-none'
@@ -133,12 +133,19 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(({
           </div>
         )}
 
-        <p className="whitespace-pre-wrap select-text break-words [overflow-wrap:anywhere] min-w-0">
-          {msg.text}
-          {isLoading && isLast && msg.sender === 'ai' && (
-            <span className="inline-block w-2 h-4 bg-[var(--accent-sage)] ml-1 animate-pulse rounded-full align-middle shrink-0" />
-          )}
-        </p>
+        {msg.sender === 'ai' && !msg.text && isLoading ? (
+          <div className="flex items-center gap-2 py-0.5 text-xs text-[var(--accent-sage)] font-bold">
+            <Sparkles className="w-4 h-4 animate-spin text-[var(--accent-sage)] shrink-0" />
+            <span className="animate-pulse">{profile.language === 'ar' ? 'يكتب الرد الآن...' : 'Typing response...'}</span>
+          </div>
+        ) : (
+          <p className="whitespace-pre-wrap select-text break-words [overflow-wrap:anywhere] min-w-0">
+            {msg.text}
+            {isLoading && isLast && msg.sender === 'ai' && (
+              <span className="inline-block w-2 h-4 bg-[var(--accent-sage)] ml-1 animate-pulse rounded-full align-middle shrink-0" />
+            )}
+          </p>
+        )}
 
         {/* Executed Action Cards */}
         {msg.actionsTaken && msg.actionsTaken.length > 0 && (
@@ -882,8 +889,8 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
           ))
         )}
 
-        {isLoading && (
-          <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] w-max text-xs text-[var(--accent-sage)] font-bold shadow-sm animate-fade-in">
+        {isLoading && messages.length > 0 && messages[messages.length - 1]?.sender === 'user' && (
+          <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] w-max text-xs text-[var(--accent-sage)] font-bold shadow-sm">
             <Sparkles className="w-4 h-4 animate-spin text-[var(--accent-sage)] shrink-0" />
             <span className="transition-all duration-300 min-w-[130px]">{currentThinkingText}</span>
           </div>

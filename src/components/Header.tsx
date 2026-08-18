@@ -170,13 +170,14 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         )}
 
-        {/* 2. Quick Tools Dropdown Menu (Controlled by action_tools_menu) */}
-        {isFeatureVisible('action_tools_menu') && (
+        {/* 2. Quick Tools Dropdown Menu (Controlled by action_tools_menu or header_quick_tools_button) */}
+        {(isFeatureVisible('action_tools_menu') || isFeatureVisible('header_quick_tools_button')) && (
           <div className="relative" ref={toolsMenuRef}>
             <button
               onClick={() => {
-                if (!isFeatureEnabled('action_tools_menu')) {
-                  triggerLockedPrompt('action_tools_menu');
+                const featKey = isFeatureVisible('header_quick_tools_button') ? 'header_quick_tools_button' : 'action_tools_menu';
+                if (!isFeatureEnabled(featKey)) {
+                  triggerLockedPrompt(featKey);
                   return;
                 }
                 setIsToolsMenuOpen(!isToolsMenuOpen);
@@ -189,7 +190,7 @@ export const Header: React.FC<HeaderProps> = ({
               title={isArabic ? 'أدوات الوصول السريع والتفضيلات' : 'Quick Tools & Preferences'}
             >
               <SlidersHorizontal className="w-4 h-4 text-[var(--accent-sage)] shrink-0" />
-              {!isFeatureEnabled('action_tools_menu') && (
+              {!isFeatureEnabled('action_tools_menu') && !isFeatureEnabled('header_quick_tools_button') && (
                 <div className="absolute -top-1 -end-1 bg-amber-500 text-white rounded-full p-0.5 shadow-sm">
                   <Lock className="w-2.5 h-2.5" />
                 </div>

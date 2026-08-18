@@ -116,35 +116,70 @@ export function filterAndFormatContext(
   const specialCounselingDirective = consultationDirective;
 
   // Filter memories & items relevant to the current conversation
+  const cleanMsg = (userMessage || '').trim().toLowerCase();
+  const isAskingSchedule = /(معانا|عندنا|عندي|جدول|مهام|مواعيد|اجندة|أجندة|باقي|المتبقي|today|schedule|tasks|agenda)/i.test(cleanMsg);
+  const isAskingNotes = /(مذكر|ملاحظ|نصوص|اقتباس|notes|snippets|memos)/i.test(cleanMsg);
+  const isAskingHabits = /(روتين|عادات|عادة|routine|habits)/i.test(cleanMsg);
+  const isAskingGoals = /(هدف|أهداف|اهداف|خطط|خطة|goals|plans)/i.test(cleanMsg);
+
+  // Group items by type & date
   const memories = items.filter((i) => i.type === 'memory');
   const habits = items.filter((i) => i.type === 'habit');
   const goals = items.filter((i) => i.type === 'goal' || i.type === 'idea');
-  const activeItems = items.filter((i) => i.status === 'pending' && i.type !== 'memory');
+  const notes = items.filter((i) => i.type === 'note' || i.type === 'idea');
+  
+  // Today's items (Tasks, Appointments, Reminders, Alarms scheduled for today)
+  const todayItems = items.filter((i) => {
+    if (i.type === 'memory' || i.type === 'habit') return false;
+    if (i.dueDate) return i.dueDate === currentDateStr;
+    // If no due date, check if created today and pending
+    return i.createdAt && i.createdAt.startsWith(currentDateStr);
+  });
 
-  const formattedMemories =
-    memories.length > 0
-      ? memories.map((m) => `- Fact/Preference: "${m.title}" (${m.category || 'general'})`).join('\n')
-      : '(No explicit saved memories yet)';
+  const todayPending = todayItems.filter((i) => i.status === 'pending');
+  const todayCompleted = todayItems.filter((i) => i.status === 'completed');
 
-  const formattedHabits =
-    habits.length > 0
-      ? habits.map((h) => `- Habit/Routine: "${h.title}"`).join('\n')
-      : '(No tracked habits)';
+  // Other future or backlog pending tasks
+  const otherPendingTasks = items.filter((i) => {
+    if (i.type === 'memory' || i.type === 'habit') return false;
+    if (i.status !== 'pending') return false;
+    return i.dueDate && i.dueDate !== currentDateStr;
+  });
 
-  const formattedGoals =
-    goals.length > 0
-      ? goals.map((g) => `- Goal/Idea: "${g.title}"`).join('\n')
-      : '(No active goals/ideas)';
+  // 1. High-Density Token-Efficient Agenda Formatting
+  let formattedTodayAgenda = '';
+  if (todayItems.length === 0) {
+    formattedTodayAgenda = '(لا توجد مهام أو مواعيد مجدولة لتاريخ اليوم حتى الآن - الجدول فارغ)';
+  } else {
+    formattedTodayAgenda = `إجمالي مهام ومواعيد اليوم: ${todayItems.length} (المتبقي قيد الانتظار: ${todayPending.length} | المنجز: ${todayCompleted.length})\n` +
+      todayItems.map((item, idx) => {
+        const priorityTag = item.priority === 'high' ? 'عاجل/عالي' : item.priority === 'low' ? 'منخفض' : 'متوسط';
+        const typeTag = item.type === 'appointment' ? 'موعد' : item.type === 'alarm' ? 'منبه' : item.type === 'reminder' ? 'تذكير' : 'مهمة';
+        const timeTag = item.dueTime ? ` [الساعة: ${item.dueTime}]` : '';
+        const statusTag = item.status === 'completed' ? 'منجز ✅' : 'قيد الانتظار ⏳';
+        return `${idx + 1}. [${typeTag} - ${priorityTag}] "${item.title}"${timeTag} - (${statusTag})`;
+      }).join('\n');
+  }
 
-  const formattedItems = JSON.stringify(
-    activeItems.slice(0, 15).map((i) => ({
-      type: i.type,
-      title: i.title,
-      status: i.status,
-      dueDate: i.dueDate,
-      dueTime: i.dueTime,
-    }))
-  );
+  // 2. High-Density Habits / Routines
+  const formattedHabits = habits.length > 0
+    ? habits.map((h, i) => `${i + 1}. "${h.title}"`).join('\n')
+    : '(لا توجد عادات أو روتين مسجل)';
+
+  // 3. High-Density Goals
+  const formattedGoals = goals.length > 0
+    ? goals.slice(0, 6).map((g, i) => `${i + 1}. "${g.title}" (التقدم: ${g.progressPercent || 0}%)`).join('\n')
+    : '(لا توجد أهداف نشطة مسجلة)';
+
+  // 4. High-Density Notes / Memos
+  const formattedNotes = notes.length > 0
+    ? notes.slice(0, 8).map((n, i) => `${i + 1}. "${n.title}" ${n.description ? `(محتوى: ${n.description.slice(0, 50)}...)` : ''}`).join('\n')
+    : '(لا توجد مذكرات أو نصوص محفوظة)';
+
+  // 5. High-Density Memories
+  const formattedMemories = memories.length > 0
+    ? memories.slice(0, 8).map((m) => `- "${m.title}" (${m.category || 'عام'})`).join('\n')
+    : '(لا توجد حقائق أو تفضيلات خاصة مسجلة)';
 
   const companionGenderText =
     profile.companionGender === 'female'
@@ -199,18 +234,37 @@ ACCURATE TIME & DATE DIRECTIVES:
 ${privateCandidDirective}
 ${specialCounselingDirective}
 
-RAFIQ'S STORED KNOWLEDGE BASE & MEMORIES (APP-OWNED PERSISTENT MEMORY):
-=== Personal Memories & Learned Facts ===
-${formattedMemories}
+=======================================================
+CRITICAL COMPREHENSIVE RECALL DIRECTIVES (بروتوكول استرجاع المهام والمذكرات والروتين):
+1. "ايش معانا اليوم؟" / "وش عندنا اليوم؟" / "جدول اليوم" / "مهامي اليوم" / "برنامجي":
+   - You MUST read and list ALL items from "TODAY'S COMPLETE SCHEDULE" below for the date (${currentDateStr}).
+   - You MUST list EVERY SINGLE ONE OF THEM in a numbered or bulleted format with priority, without omitting, skipping, or sampling only 2 or 3 items. If there are 7 tasks, list all 7 tasks clearly!
+   - Highlight the remaining pending tasks versus completed ones.
+2. "ايش باقي؟" / "وش باقي؟" / "ما المتبقي؟" / "ماذا بقي؟":
+   - Filter items with [قيد الانتظار ⏳] for today and state EXACTLY all remaining tasks that need attention, clearly stating how many remain out of the total.
+3. "المذكرات" / "الملاحظات" / "المقتطفات":
+   - List the user's saved notes and memos from "USER SAVED NOTES & MEMOS".
+4. "الروتين" / "العادات":
+   - List the tracked daily habits and routines from "USER HABITS & ROUTINES".
+5. "الأهداف" / "خططي":
+   - List the strategic goals and milestones from "USER GOALS & IDEAS".
+=======================================================
 
-=== User Habits & Routines ===
+RAFIQ'S STORED KNOWLEDGE BASE & STRUCTURED AGENDA:
+=== TODAY'S COMPLETE SCHEDULE (تاريخ: ${currentDateStr}) ===
+${formattedTodayAgenda}
+
+=== USER HABITS & DAILY ROUTINES ===
 ${formattedHabits}
 
-=== User Goals & Ideas ===
+=== USER SAVED NOTES & MEMOS ===
+${formattedNotes}
+
+=== USER GOALS & IDEAS ===
 ${formattedGoals}
 
-=== Active Scheduled Items (Summary) ===
-${formattedItems}
+=== PERSONAL MEMORIES & LEARNED FACTS ===
+${formattedMemories}
 
 CORE BEHAVIORAL DIRECTIVES:
 1. EXTREME RESPONSIVENESS & CONTEXT RECALL:
@@ -240,6 +294,6 @@ CORE BEHAVIORAL DIRECTIVES:
   return {
     systemInstruction,
     formattedMemories,
-    formattedItems,
+    formattedItems: formattedTodayAgenda,
   };
 }

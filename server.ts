@@ -172,7 +172,10 @@ async function startServer() {
     actions?: any[],
     createdOrUpdatedItems?: any[],
     updatedProfile?: any,
-    mediaInfo?: { url?: string; type?: string; name?: string }
+    mediaInfo?: { url?: string; type?: string; name?: string },
+    userMessageId?: string,
+    aiMessageId?: string,
+    senderSessionId?: string
   ) => {
     if (!profile) return;
     const uid = profile.id;
@@ -189,7 +192,7 @@ async function startServer() {
     const nowIso = new Date().toISOString();
     const newUserMsg = userMessageText
       ? {
-          id: 'msg_u_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+          id: userMessageId || ('msg_u_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6)),
           sender: 'user',
           text: userMessageText,
           timestamp: nowIso,
@@ -201,7 +204,7 @@ async function startServer() {
 
     const newAiMsg = aiReplyText
       ? {
-          id: 'msg_a_' + (Date.now() + 10) + '_' + Math.random().toString(36).substring(2, 6),
+          id: aiMessageId || ('msg_a_' + (Date.now() + 10) + '_' + Math.random().toString(36).substring(2, 6)),
           sender: 'ai',
           text: aiReplyText,
           timestamp: new Date(Date.now() + 20).toISOString(),
@@ -249,6 +252,7 @@ async function startServer() {
     realtimeSyncService.broadcastToUser(user.id, user.email, 'user_chat_sync', {
       userId: user.id,
       email: user.email,
+      senderSessionId,
       newUserMessage: newUserMsg,
       newAiMessage: newAiMsg,
       createdOrUpdatedItems,
@@ -260,7 +264,21 @@ async function startServer() {
 
   app.post('/api/companion/chat-stream', async (req, res) => {
     try {
-      const { message, history, profile, items, mediaBase64, mediaMimeType, clientTimeContext, mediaUrl, mediaType, mediaName } = req.body;
+      const {
+        message,
+        history,
+        profile,
+        items,
+        mediaBase64,
+        mediaMimeType,
+        clientTimeContext,
+        mediaUrl,
+        mediaType,
+        mediaName,
+        userMessageId,
+        aiMessageId,
+        clientSessionId,
+      } = req.body;
       if (!message && !mediaBase64) {
         return res.status(400).json({ error: 'Message or media parameter is required' });
       }
@@ -292,7 +310,10 @@ async function startServer() {
           result.actions,
           result.createdOrUpdatedItems,
           result.updatedProfile,
-          { url: mediaUrl, type: mediaType, name: mediaName }
+          { url: mediaUrl, type: mediaType, name: mediaName },
+          userMessageId,
+          aiMessageId,
+          clientSessionId
         );
       } catch (syncErr) {
         console.warn('Chat stream auto sync error:', syncErr);
@@ -320,7 +341,21 @@ async function startServer() {
 
   app.post('/api/companion/chat', async (req, res) => {
     try {
-      const { message, history, profile, items, mediaBase64, mediaMimeType, clientTimeContext, mediaUrl, mediaType, mediaName } = req.body;
+      const {
+        message,
+        history,
+        profile,
+        items,
+        mediaBase64,
+        mediaMimeType,
+        clientTimeContext,
+        mediaUrl,
+        mediaType,
+        mediaName,
+        userMessageId,
+        aiMessageId,
+        clientSessionId,
+      } = req.body;
       if (!message && !mediaBase64) {
         return res.status(400).json({ error: 'Message or media parameter is required' });
       }
@@ -344,7 +379,10 @@ async function startServer() {
           result.actions,
           result.createdOrUpdatedItems,
           result.updatedProfile,
-          { url: mediaUrl, type: mediaType, name: mediaName }
+          { url: mediaUrl, type: mediaType, name: mediaName },
+          userMessageId,
+          aiMessageId,
+          clientSessionId
         );
       } catch (syncErr) {
         console.warn('Chat auto sync error:', syncErr);
