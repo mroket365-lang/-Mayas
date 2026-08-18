@@ -2,13 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Crown, CheckCircle2, Sparkles, Zap, Shield, X, CreditCard, Building2, Wallet, Send, Check, MapPin, Upload, FileText } from 'lucide-react';
 import { UserProfile } from '../types';
 
+import { SystemPublicSettings } from '../App';
+
 interface SubscriptionModalProps {
   profile: UserProfile;
   onClose: () => void;
   onProfileUpdated?: (updatedProfile: UserProfile) => void;
+  systemSettings?: SystemPublicSettings | null;
 }
 
-export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, onClose, onProfileUpdated }) => {
+export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ profile, onClose, onProfileUpdated, systemSettings }) => {
   const isArabic = profile.language === 'ar';
   const userId = profile.id || 'user_default_01';
 

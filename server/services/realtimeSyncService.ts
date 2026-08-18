@@ -69,8 +69,13 @@ class RealtimeSyncService {
       voiceEnabled: Boolean(settings.voiceEnabled),
       privateCandidAllowed: evaluateFeature(settings.privateCandidVisibility),
       maritalSupportAllowed: evaluateFeature(settings.maritalSupportVisibility),
+      subscriptionUpgradeAllowed: settings.subscriptionUpgradeVisibility
+        ? evaluateFeature(settings.subscriptionUpgradeVisibility)
+        : true,
       privateCandidMode: settings.privateCandidVisibility?.mode || 'hidden',
       maritalSupportMode: settings.maritalSupportVisibility?.mode || 'hidden',
+      subscriptionUpgradeMode: settings.subscriptionUpgradeVisibility?.mode || 'everyone',
+      subscriptionUpgradeConfig: settings.subscriptionUpgradeVisibility || { mode: 'everyone' },
       updatedAt: settings.updatedAt || new Date().toISOString(),
       plans: db.getPlans().filter((p) => p.active),
       paymentMethods: (settings.paymentMethods || []).filter((p) => p.enabled),
@@ -89,9 +94,6 @@ class RealtimeSyncService {
           data: customPayload,
         };
         client.res.write(`event: ${eventType}\n`);
-        client.res.write(`data: ${JSON.stringify(payload)}\n\n`);
-        // Generic message event
-        client.res.write(`event: message\n`);
         client.res.write(`data: ${JSON.stringify(payload)}\n\n`);
       } catch (err) {
         this.clients.delete(clientId);
@@ -121,8 +123,6 @@ class RealtimeSyncService {
             data: payload,
           };
           client.res.write(`event: ${eventType}\n`);
-          client.res.write(`data: ${JSON.stringify(eventData)}\n\n`);
-          client.res.write(`event: message\n`);
           client.res.write(`data: ${JSON.stringify(eventData)}\n\n`);
         } catch (err) {
           this.clients.delete(clientId);

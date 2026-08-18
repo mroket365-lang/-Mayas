@@ -1,4 +1,5 @@
 import { CompanionItem, ChatMessage, UserProfile, DailyReport, DailyCheckIn, TaskCategory } from '../types';
+import { sanitizeAndDeduplicateMessages } from '../utils/messageUtils';
 
 const STORAGE_KEYS = {
   PROFILE: 'rafiq_user_profile',
@@ -204,7 +205,8 @@ export const storageService = {
 
       const data = localStorage.getItem(STORAGE_KEYS.MESSAGES);
       if (!data) return [];
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      return sanitizeAndDeduplicateMessages(parsed);
     } catch (e) {
       console.error('Failed to load messages:', e);
       return [];
@@ -239,8 +241,10 @@ export const storageService = {
     // Update guest session timestamp if guest
     this.touchGuestSession();
 
-    // 1. Sanitize messages for storage: keep last 150 messages & strip heavy base64 mediaUrl strings
-    let toSave: ChatMessage[] = messages.slice(-150).map(m => {
+    // 1. Sanitize & deduplicate messages for storage
+    const sanitized = sanitizeAndDeduplicateMessages(messages);
+
+    let toSave: ChatMessage[] = sanitized.slice(-150).map(m => {
       if (m.mediaUrl && m.mediaUrl.length > 2000) {
         // Exclude heavy base64 data string from persistent localStorage
         const { mediaUrl, ...rest } = m;
@@ -283,8 +287,7 @@ export const storageService = {
 
   addMessage(msg: ChatMessage): ChatMessage[] {
     const msgs = this.getMessages();
-    const exists = msgs.some(m => m.id === msg.id);
-    const updated = exists ? msgs.map(m => (m.id === msg.id ? msg : m)) : [...msgs, msg];
+    const updated = sanitizeAndDeduplicateMessages([...msgs, msg]);
     this.saveMessages(updated);
     return updated;
   },

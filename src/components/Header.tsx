@@ -124,7 +124,7 @@ export const Header: React.FC<HeaderProps> = ({
             <LogIn className="w-3.5 h-3.5 shrink-0" />
             <span className="whitespace-nowrap">{isArabic ? 'دخول / تسجيل' : 'Login'}</span>
           </button>
-        ) : onOpenSubscription && isFeatureVisible('header_upgrade_button') ? (
+        ) : onOpenSubscription && isFeatureVisible('header_upgrade_button') && (systemSettings?.subscriptionUpgradeAllowed !== false) ? (
           <button
             onClick={() => {
               if (!isFeatureEnabled('header_upgrade_button')) {

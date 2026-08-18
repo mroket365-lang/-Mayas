@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, ShieldAlert, CheckCircle2, Save, RefreshCw, KeyRound, Eye, Lock, UserCheck, HeartHandshake } from 'lucide-react';
+import { Settings, ShieldAlert, CheckCircle2, Save, RefreshCw, KeyRound, Eye, Lock, UserCheck, HeartHandshake, Crown } from 'lucide-react';
 import { FeatureFlagConfig } from '../types';
 
 interface AuthMethodsConfig {
@@ -16,6 +16,7 @@ interface SystemSettings {
   authMethods?: AuthMethodsConfig;
   privateCandidVisibility?: FeatureFlagConfig;
   maritalSupportVisibility?: FeatureFlagConfig;
+  subscriptionUpgradeVisibility?: FeatureFlagConfig;
 }
 
 interface AdminSettingsViewProps {
@@ -150,6 +151,7 @@ export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({ token }) =
 
   const pConfig = settings.privateCandidVisibility || { mode: 'hidden' };
   const mConfig = settings.maritalSupportVisibility || { mode: 'hidden' };
+  const subConfig = settings.subscriptionUpgradeVisibility || { mode: 'everyone' };
 
   return (
     <div className="space-y-6">
@@ -386,6 +388,135 @@ export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({ token }) =
                   />
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* 3. Subscription & Upgrade Plans Visibility Control */}
+          <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-bold text-slate-100 flex items-center gap-2">
+                  <Crown className="w-4 h-4 text-amber-400" />
+                  <span>باقات الاشتراك ورؤية أزرار الترقية (Subscription & Upgrade Visibility)</span>
+                </h4>
+                <p className="text-slate-400 text-[11px] mt-0.5">
+                  التحكم في ظهور وإخفاء أزرار الترقية وباقات الاشتراك للمستخدمين في أعلى التطبيق والبروفايل.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2">
+              <div>
+                <label className="block text-slate-400 text-[11px] mb-1">حالة الإتاحة (Visibility Mode)</label>
+                <select
+                  value={subConfig.mode}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      subscriptionUpgradeVisibility: { ...subConfig, mode: e.target.value as any },
+                    })
+                  }
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                >
+                  <option value="everyone">إتاحة الميزة للجميع (Everyone - إظهار للجميع)</option>
+                  <option value="hidden">إخفاء الميزة عن الجميع (Hidden - إخفاء تام)</option>
+                  <option value="specific_user">مستخدم محدد فقط (Specific User ID/Email)</option>
+                  <option value="allowed_users_list">قائمة مستخدمين مسموحين (Allowed Users List)</option>
+                  <option value="region">حسب الدولة / المنطقة (Region/Country)</option>
+                </select>
+              </div>
+
+              {subConfig.mode === 'specific_user' && (
+                <div className="col-span-2">
+                  <label className="block text-slate-400 text-[11px] mb-1">المعرف أو البريد للمستخدم المسموح له</label>
+                  <input
+                    type="text"
+                    value={subConfig.allowedUserId || ''}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        subscriptionUpgradeVisibility: { ...subConfig, allowedUserId: e.target.value },
+                      })
+                    }
+                    placeholder="مثال: USR-123456 أو m.roket365@gmail.com"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              )}
+
+              {subConfig.mode === 'allowed_users_list' && (
+                <div className="col-span-2">
+                  <label className="block text-slate-400 text-[11px] mb-1">قائمة المعرفات/الإيميلات المسموح لها (مفصولة بفواصل)</label>
+                  <input
+                    type="text"
+                    value={subConfig.allowedUsersList || ''}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        subscriptionUpgradeVisibility: { ...subConfig, allowedUsersList: e.target.value },
+                      })
+                    }
+                    placeholder="USR-101, USR-102, user@example.com"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              )}
+
+              {subConfig.mode === 'region' && (
+                <div className="col-span-2">
+                  <label className="block text-slate-400 text-[11px] mb-1">رمز الدولة/المنطقة المسموح لها (مثال: SA, AE, KW)</label>
+                  <input
+                    type="text"
+                    value={subConfig.allowedRegion || ''}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        subscriptionUpgradeVisibility: { ...subConfig, allowedRegion: e.target.value },
+                      })
+                    }
+                    placeholder="SA, AE, EG, US"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Admin Instructions Banner / دليل مدير النظام */}
+            <div className="mt-3 p-3.5 bg-slate-900/90 border border-amber-500/30 rounded-xl space-y-2 text-[11px] text-slate-300">
+              <div className="flex items-center gap-2 font-bold text-amber-400">
+                <Crown className="w-4 h-4 shrink-0" />
+                <span>دليل مدير النظام: ما الذي يحدث عند ضبط هذا الخيار؟</span>
+              </div>
+              <ul className="space-y-1.5 list-disc list-inside text-slate-300 pr-1 leading-relaxed">
+                {subConfig.mode === 'hidden' && (
+                  <li className="text-amber-300 font-semibold">
+                    🔴 <strong>إخفاء تام (Hidden):</strong> سيختفي زر "ترقية ✨" في الهيدر العلوي للتطبيق، وباقة الترقية في الملف الشخصي لجميع المستخدمين بدون استثناء.
+                  </li>
+                )}
+                {subConfig.mode === 'everyone' && (
+                  <li className="text-emerald-300 font-semibold">
+                    🟢 <strong>إتاحة للجميع (Everyone):</strong> سيظهر زر "ترقية ✨" وباقات الاشتراك لجميع مستخدمي التطبيق والزوار بوضوح.
+                  </li>
+                )}
+                {subConfig.mode === 'specific_user' && (
+                  <li className="text-indigo-300 font-semibold">
+                    👤 <strong>مستخدم محدد (Specific User):</strong> لن يظهر زر الترقية إلا للمستخدم المطابق للمعرف أو البريد المكتوب ({subConfig.allowedUserId || 'لم يُحدد بعد'}) ويبقى مخفياً عن باقي المستخدمين.
+                  </li>
+                )}
+                {subConfig.mode === 'allowed_users_list' && (
+                  <li className="text-blue-300 font-semibold">
+                    📋 <strong>قائمة مسموحة (Allowed List):</strong> يظهر زر الترقية فقط للمستخدمين المكتوبة إيميلاتهم أو أرقامهم في القائمة أعلاه مفصولة بفاصلة.
+                  </li>
+                )}
+                {subConfig.mode === 'region' && (
+                  <li className="text-purple-300 font-semibold">
+                    🗺️ <strong>حسب الدولة (Region):</strong> يظهر زر الترقية فقط للمستخدمين القادمين من الدول المحددة ({subConfig.allowedRegion || 'لم تُحدد بعد'}).
+                  </li>
+                )}
+                <li className="text-slate-400">
+                  ⚡ <strong>المزامنة الفورية:</strong> بمجرد الضغط على "حفظ الإعدادات"، ستنعكس النتيجة فوراً على شاشات المستخدمين دون الحاجة لتحديث الصفحة بفضل نظام البث المباشر (SSE).
+                </li>
+              </ul>
             </div>
           </div>
         </div>

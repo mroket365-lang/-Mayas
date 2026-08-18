@@ -486,13 +486,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
             {/* Logout and Subscription Quick Actions */}
             <div className="flex items-center gap-2 self-center sm:self-start">
-              <button
-                onClick={onOpenSubscription}
-                className="px-3.5 py-2 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-amber-500/20"
-              >
-                <Crown className="w-3.5 h-3.5 text-amber-100" />
-                <span>{isArabic ? 'ترقية الخطة' : 'Upgrade Plan'}</span>
-              </button>
+              {systemSettings?.subscriptionUpgradeAllowed !== false && (
+                <button
+                  onClick={onOpenSubscription}
+                  className="px-3.5 py-2 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-amber-500/20"
+                >
+                  <Crown className="w-3.5 h-3.5 text-amber-100" />
+                  <span>{isArabic ? 'ترقية الخطة' : 'Upgrade Plan'}</span>
+                </button>
+              )}
 
               <button
                 onClick={onLogout}

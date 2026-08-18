@@ -208,7 +208,26 @@ class RealtimeClient {
     };
   }
 
+  private lastNotifiedEvents: Map<string, number> = new Map();
+
   public notifyListeners(eventType: string, payload: any) {
+    // Event deduplication check: avoid firing identical payload for same event within 1200ms
+    const payloadStr = typeof payload === 'object' ? JSON.stringify(payload) : String(payload);
+    const eventKey = `${eventType}:${payloadStr.slice(0, 150)}`;
+    const now = Date.now();
+    const lastTime = this.lastNotifiedEvents.get(eventKey) || 0;
+    if (now - lastTime < 1200) {
+      return; // Ignore duplicate rapid event trigger
+    }
+    this.lastNotifiedEvents.set(eventKey, now);
+
+    // Clean up old deduplication entries
+    if (this.lastNotifiedEvents.size > 50) {
+      for (const [key, time] of this.lastNotifiedEvents.entries()) {
+        if (now - time > 5000) this.lastNotifiedEvents.delete(key);
+      }
+    }
+
     // Notify specific event listeners
     const evListeners = this.listeners.get(eventType);
     if (evListeners) {

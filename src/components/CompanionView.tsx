@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage, UserProfile, CompanionItem } from '../types';
+import { sanitizeAndDeduplicateMessages } from '../utils/messageUtils';
 import { getTranslation } from '../locales/translations';
 import {
   Send,
@@ -444,35 +445,52 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
   }, [isLoading]);
 
   const prevMsgLengthRef = useRef(messages.length);
+  const isSubmittingRef = useRef(false);
 
+  // Clean, vibration-free auto scroll logic
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    const isNewMessage = messages.length !== prevMsgLengthRef.current;
+    const isNewMessage = messages.length > prevMsgLengthRef.current;
     prevMsgLengthRef.current = messages.length;
 
-    const timer = setTimeout(() => {
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: isNewMessage ? 'smooth' : 'auto',
+    if (isNewMessage) {
+      // Smooth scroll on new message addition
+      requestAnimationFrame(() => {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: 'smooth',
+        });
       });
-    }, 50);
-
-    return () => clearTimeout(timer);
+    } else if (isLoading) {
+      // Instant, non-flickering scroll during AI streaming if user is near bottom
+      const isNearBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight < 180;
+      if (isNearBottom) {
+        requestAnimationFrame(() => {
+          container.scrollTop = container.scrollHeight;
+        });
+      }
+    }
   }, [messages.length, isLoading, messages[messages.length - 1]?.text]);
 
   const handleSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if ((!inputText.trim() && !attachedMedia) || isLoading) return;
+    if ((!inputText.trim() && !attachedMedia) || isLoading || isSubmittingRef.current) return;
 
+    isSubmittingRef.current = true;
     const textToSend = inputText;
     const mediaToSend = attachedMedia;
 
     setInputText('');
     setAttachedMedia(null);
 
-    await onSendMessage(textToSend, mediaToSend || undefined);
+    try {
+      await onSendMessage(textToSend, mediaToSend || undefined);
+    } finally {
+      isSubmittingRef.current = false;
+    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -873,13 +891,11 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
             </div>
           </div>
         ) : (
-          messages
-            .filter((msg, idx, arr) => arr.findIndex((m) => m.id === msg.id) === idx)
-            .map((msg, idx, arr) => (
-              <ChatMessageItem
-                key={msg.id}
-                msg={msg}
-                isLast={idx === arr.length - 1}
+          sanitizeAndDeduplicateMessages(messages, isLoading).map((msg, idx, arr) => (
+            <ChatMessageItem
+              key={msg.id || `msg_${idx}`}
+              msg={msg}
+              isLast={idx === arr.length - 1}
                 isLoading={isLoading}
                 profile={profile}
                 copiedMsgId={copiedMsgId}

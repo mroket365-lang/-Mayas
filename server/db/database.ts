@@ -254,6 +254,7 @@ export interface SystemSettingsEntity {
   };
   privateCandidVisibility?: FeatureFlagConfig;
   maritalSupportVisibility?: FeatureFlagConfig;
+  subscriptionUpgradeVisibility?: FeatureFlagConfig;
   superAdminEmail?: string;
   superAdminPassword?: string;
   paymentMethods?: PaymentMethodEntity[];

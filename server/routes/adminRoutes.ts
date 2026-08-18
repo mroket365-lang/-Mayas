@@ -688,6 +688,7 @@ adminRouter.put('/settings', requireAdminAuth, requireSuperAdmin, (req: Request,
     authMethods,
     privateCandidVisibility,
     maritalSupportVisibility,
+    subscriptionUpgradeVisibility,
   } = req.body;
   const session = (req as any).adminSession;
 
@@ -700,6 +701,7 @@ adminRouter.put('/settings', requireAdminAuth, requireSuperAdmin, (req: Request,
     authMethods: authMethods || undefined,
     privateCandidVisibility: privateCandidVisibility || undefined,
     maritalSupportVisibility: maritalSupportVisibility || undefined,
+    subscriptionUpgradeVisibility: subscriptionUpgradeVisibility || undefined,
   });
 
   db.addAuditLog({

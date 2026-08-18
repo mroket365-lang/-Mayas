@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ShieldAlert, AlertTriangle, Minimize2 } from 'lucide-react';
 import { UserProfile, CompanionItem, ChatMessage } from './types';
+import { sanitizeAndDeduplicateMessages } from './utils/messageUtils';
 import { storageService } from './services/storageService';
 import { alarmEngine } from './services/alarmEngine';
 import { speechService } from './services/speechService';
@@ -31,8 +32,11 @@ export interface SystemPublicSettings {
   voiceEnabled: boolean;
   privateCandidAllowed: boolean;
   maritalSupportAllowed: boolean;
+  subscriptionUpgradeAllowed?: boolean;
   privateCandidMode: string;
   maritalSupportMode: string;
+  subscriptionUpgradeMode?: string;
+  subscriptionUpgradeConfig?: any;
   authMethods?: {
     googleAuthEnabled: boolean;
     emailPasswordEnabled: boolean;
@@ -173,12 +177,8 @@ export default function App() {
       }
       if (Array.isArray(data.messagesData)) {
         setMessages((prev) => {
-          const msgMap = new Map<string, ChatMessage>();
-          prev.forEach((m) => { if (m?.id) msgMap.set(m.id, m); });
-          data.messagesData.forEach((m: ChatMessage) => { if (m?.id) msgMap.set(m.id, m); });
-          const merged = Array.from(msgMap.values()).sort(
-            (a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
-          );
+          const combined = [...prev, ...data.messagesData];
+          const merged = sanitizeAndDeduplicateMessages(combined);
           storageService.saveMessages(merged);
           return merged;
         });
@@ -231,18 +231,13 @@ export default function App() {
         return;
       }
 
-      if (data.newUserMessage || data.newAiMessage) {
+      if (data.newUserMessage || data.newAiMessage || Array.isArray(data.messagesData)) {
         setMessages((prev) => {
-          const msgMap = new Map<string, ChatMessage>();
-          prev.forEach((m) => { if (m?.id) msgMap.set(m.id, m); });
-          if (data.newUserMessage?.id) msgMap.set(data.newUserMessage.id, data.newUserMessage);
-          if (data.newAiMessage?.id) msgMap.set(data.newAiMessage.id, data.newAiMessage);
-          if (Array.isArray(data.messagesData)) {
-            data.messagesData.forEach((m: ChatMessage) => { if (m?.id) msgMap.set(m.id, m); });
-          }
-          const merged = Array.from(msgMap.values()).sort(
-            (a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
-          );
+          const toCombine = [...prev];
+          if (data.newUserMessage) toCombine.push(data.newUserMessage);
+          if (data.newAiMessage) toCombine.push(data.newAiMessage);
+          if (Array.isArray(data.messagesData)) toCombine.push(...data.messagesData);
+          const merged = sanitizeAndDeduplicateMessages(toCombine);
           storageService.saveMessages(merged);
           return merged;
         });
@@ -817,6 +812,7 @@ export default function App() {
       {isSubscriptionOpen && (
         <SubscriptionModal
           profile={profile}
+          systemSettings={systemSettings}
           onClose={() => setIsSubscriptionOpen(false)}
           onProfileUpdated={(updatedProfile) => {
             setProfile(updatedProfile);
