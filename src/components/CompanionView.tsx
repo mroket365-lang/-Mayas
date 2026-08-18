@@ -873,20 +873,22 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
             </div>
           </div>
         ) : (
-          messages.map((msg, idx) => (
-            <ChatMessageItem
-              key={msg.id}
-              msg={msg}
-              isLast={idx === messages.length - 1}
-              isLoading={isLoading}
-              profile={profile}
-              copiedMsgId={copiedMsgId}
-              speakingMsgId={speakingMsgId}
-              onCopyMessage={handleCopyMessage}
-              onExtractText={setExtractingText}
-              onToggleSpeech={handleToggleSpeech}
-            />
-          ))
+          messages
+            .filter((msg, idx, arr) => arr.findIndex((m) => m.id === msg.id) === idx)
+            .map((msg, idx, arr) => (
+              <ChatMessageItem
+                key={msg.id}
+                msg={msg}
+                isLast={idx === arr.length - 1}
+                isLoading={isLoading}
+                profile={profile}
+                copiedMsgId={copiedMsgId}
+                speakingMsgId={speakingMsgId}
+                onCopyMessage={handleCopyMessage}
+                onExtractText={setExtractingText}
+                onToggleSpeech={handleToggleSpeech}
+              />
+            ))
         )}
 
         {isLoading && messages.length > 0 && messages[messages.length - 1]?.sender === 'user' && (
@@ -1068,7 +1070,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
               </>
             )}
 
-            {/* Clear, Multi-line Auto-Expanding Textarea with Defined Borders & Return Line-Break Behavior */}
+            {/* Clear, Multi-line Auto-Expanding Textarea with Defined Borders & Standard Global AI Chat Keyboard Behavior */}
             <div className="relative flex-1 min-w-0">
               <textarea
                 ref={textareaRef}
@@ -1076,14 +1078,27 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    // Do NOT submit form on Enter!
-                    // Allow Enter key / Return arrow on soft keyboards to insert a new line \n naturally
-                    e.stopPropagation();
+                  // Standard AI Chat Keyboard Behavior:
+                  // On Desktop: Enter alone sends the message; Shift+Enter (or Ctrl/Alt+Enter) creates a new line.
+                  // On touch devices / mobile soft keyboards (composition / virtual), standard line breaks are preserved.
+                  if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                    // Check if not composing (IME) and screen is wide enough or user is on physical keyboard
+                    if (!e.nativeEvent.isComposing) {
+                      const isTouchDevice =
+                        typeof window !== 'undefined' &&
+                        ('ontouchstart' in window || navigator.maxTouchPoints > 0) &&
+                        window.innerWidth < 768;
+
+                      // If not a mobile touch keyboard, send on Enter!
+                      if (!isTouchDevice) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }
                   }
                 }}
                 placeholder={t.typeMessage}
-                className="w-full px-3.5 py-2.5 sm:py-3 rounded-2xl border-2 border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] text-xs sm:text-sm font-medium leading-relaxed focus:outline-none focus:border-[var(--accent-sage)] focus:ring-2 focus:ring-[var(--accent-sage)]/20 shadow-inner resize-none transition-all"
+                className="w-full px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-2xl border-2 border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-main)] text-xs sm:text-sm font-medium leading-relaxed focus:outline-none focus:border-[var(--accent-sage)] focus:ring-2 focus:ring-[var(--accent-sage)]/20 shadow-inner resize-none transition-all placeholder:text-[var(--text-muted)]/70 scrollbar-thin"
                 style={{ minHeight: '44px', maxHeight: '160px' }}
               />
             </div>
